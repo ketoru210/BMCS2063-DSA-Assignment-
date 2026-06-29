@@ -19,9 +19,14 @@
 
 > notes: this module description is just a short one. For more information, refer to assignment question
 
-## Submission Date
+## Timeline
 
-**Week 10 Friday 11.59 pm.**
+> Submission Date: Week 10 Friday 11.59 pm.
+
+- Code Writing: Week 3 - Week 8
+- Early Code Integration: Week 6
+- Final Code Integration & Documentation: Week 9
+- Last Checking: Week 10
 
 ---
 
@@ -188,3 +193,35 @@ src/
 - Room No.: `zone-floorRoom` -> e.g. `A-1203`
 - Date: `dd-MM-yyyy` -> e.g. `26-06-2026`
 - Money: `RM` + 2 decimals floating point number -> e.g. `RM 250.00`
+
+# Implementation Details
+
+## Menu Design
+
+### Main Menu
+
+```
+=== TARUMT Resorts ===
+(^_^)/ Welcome!
+
+[0] Exit
+[1] Walk-In Registration & Standard Booking Procedure
+[2] Vip & Loyalty Tier-Priority Room Allocation
+[3] Housekeeping and Task Log
+[4] Front-Desk Service
+[5] Loyalty and Rewards Service
+
+Please Select > 
+```
+
+> modules 的 menu 你们自己设计
+
+### 一点小设定
+
+> 有意见可以提
+
+- use `===` to wrap title
+    - e.g. `=== VIP & Loyalty Tier-Priority Room Allocation ===`
+- use `[n]` for option
+- must provide `[0]` for exit/go back
+- use `>` for prompt
