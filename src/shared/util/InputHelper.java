@@ -27,8 +27,13 @@ public final class InputHelper {
             try {
                 return Integer.parseInt(input);
             } catch (NumberFormatException e) {
-                System.out.println("Invalid number, please try again.");
+                OutputHelper.printErr("Please enter a number.");
             }
         }
+    }
+
+    public static void waitForEnter() {
+        OutputHelper.printBlue("\nPress [Enter] to continue ...");
+        SCANNER.nextLine();
     }
 }
