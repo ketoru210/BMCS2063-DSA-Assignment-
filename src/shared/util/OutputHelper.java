@@ -11,21 +11,15 @@ public class OutputHelper {
     }
 
     public static void printOK(String msg) {
-        System.out.print(greenANSI);
-        System.out.print(msg);
-        System.out.println(resetANSI);
+        System.out.println(greenANSI + msg + resetANSI);
     }
 
     public static void printErr(String msg) {
-        System.err.print(redANSI);
-        System.err.print(msg);
-        System.out.println(resetANSI);
+        System.err.println(redANSI + msg + resetANSI);
     }
 
     public static void printBlue(String msg) {
-        System.err.print(blueANSI);
-        System.err.print(msg);
-        System.out.println(resetANSI);
+        System.out.println(blueANSI + msg + resetANSI);
     }
 
     public static void printOptions(String[] options) {
