@@ -1,10 +1,13 @@
+import allocation.boundary.AllocationUI;
 import shared.util.InputHelper;
-import shared.util.OutputHelper;
+import shared.util.Menu;
+import shared.util.MenuItem;
 
 public class Main {
-    private static final String title = "TARUMT Resorts";
+    private static final String TITLE = "TARUMT Resorts";
+    private static final String BANNER = "(^_^)/ Welcome!";
 
-    private enum MenuOption {
+    private enum MenuOption implements MenuItem {
         EXIT("Exit",
                 () -> {}
         ),
@@ -12,7 +15,7 @@ public class Main {
                 () -> System.out.println("//TODO: Redirect to Module 1")
         ),
         VIP_PRIORITY("VIP & Loyalty Tier-Priority Room Allocation",
-                () -> System.out.println("//TODO: Redirect to Module 2")
+                () -> new AllocationUI().run()
         ),
         HOUSEKEEPING("Housekeeping and Task Log",
                 () -> System.out.println("//TODO: Redirect to Module 3")
@@ -32,50 +35,26 @@ public class Main {
             this.action = action;
         }
 
-        void run() {
-            action.run();
+        @Override
+        public String label() {
+            return label;
         }
 
-        static String[] labels() {
-            MenuOption[] values = values();
-            String[] labels = new String[values.length];
-            for (int i = 0; i < values.length; i++) {
-                labels[i] = values[i].label;
-            }
-            return labels;
+        @Override
+        public void run() {
+            action.run();
         }
     }
 
     public static void main(String[] args) {
         for (;;) {
-            displayMenu();
-            MenuOption selected = getOption("\nPlease Select > ");
+            MenuOption selected = Menu.prompt(TITLE, BANNER, MenuOption.values());
 
             if (selected == MenuOption.EXIT) {
                 return;
             }
             selected.run();
             InputHelper.waitForEnter();
-        }
-    }
-
-    private static void displayMenu() {
-        OutputHelper.clearScreen();
-        OutputHelper.printTitle(title);
-        System.out.println("(^_^)/ Welcome!\n");
-        OutputHelper.printOptions(MenuOption.labels());
-    }
-
-    private static MenuOption getOption(String prompt) {
-        MenuOption[] values = MenuOption.values();
-        for (;;) {
-            int choice = InputHelper.readInt(prompt);
-
-            if (choice < 0 || choice >= values.length) {
-                OutputHelper.printErr("Please enter number between 0 and " + (values.length - 1) + " (inclusive)");
-                continue;
-            }
-            return values[choice];
         }
     }
 }
