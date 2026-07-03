@@ -1,32 +1,47 @@
 # Project Description
 
-> A **console-based prototype system** for TAR UMT Resorts 
-> Full CLI, we don't do GUI
-> **Must implement `Interface`**
+> - A **console-based prototype system** for TAR UMT Resorts 
+> - Full CLI, we don't do GUI
+> - **Must implement `Interface`**
 
 ## Modules Break Down
 
 > Total 6 modules
 
-| *Modules* | *Data Structure* | *Reason* | *Description* | *Assigned to* |
-|---|---|---|---|---|
-| Walk-In Registrations & Standard Booking Procedure | Queue | Obvious, a queue must be FIFO | When there are rooms available and walk-in is available, process standard guests as a queue | Pujin | 
-| VIP & Loyalty Tier-Priority Room Allocation | Heap | To create a binary tree to dynamically reorganize the data (ensuring VIP always at the root) | Customer with higher loyalty tier can bypass lower loaylty tier, room allocation must prioritize high loaylty tier member | YZ |
-| Housekeeping and Task Log | Stack | To perform "undo / redo" | Housekeeping supervisor updates room status sequentially, if any mistake occur, the schedule must roll back instantly | QW |
-| Front-Desk Service | Hash | To preform o(1) search | Search by 8-digit confirmation number | YZ |
-| Loyalty and Rewards Service | List | Member has many attributes, and random access is needed | Manage the member enrollment, points accumulation and redemption, tier progression process / track redemption requests. Also notifications reminders for expiring points, redemption requets, or tier upgrades | KY |
-| Summary Reports - Executive Revenue & Occupancy Reports | - | Search & Sort just consider on algorithms | Generate reports, should able to filter matching criteria | All Members, each member do 1 per their own module(s) |
+| *No.* | *Modules* | *Suggest ADT* | *Assigned to* | *Reason* |
+|------|---|---|---|---|
+| M1 | Walk-In Registration & Standard Booking | Deque | YZ | FIFO is the business rule itself (chronological processing), all core ops O(1); `addFront` lets a called guest rejoin the front; tightly coupled with M2 -> same owner |
+| M2 | VIP & Loyalty Tier-Priority Room Allocation | Max-Heap (**team ADT**) | YZ | not covered in the course (originality marks); insert reorganizes automatically so the highest priority is always at the root — exactly the spec wording; priority = static key `tier*W - arrivalSeq*r`, so waiting-time aging needs no re-heapify |
+| M3 | Housekeeping and Task Log | 2 * LinkedStack | Pujin | LIFO matches undo semantics; O(1) push/pop = spec's "roll back instantly"; second stack enables redo (cleared on new action) |
+| M4 | Front-Desk Service | Binary Search Tree (BST) / harder: AVL Tree | QW | tutor advised against hash; O(log n) search on the unique comparable confirmationNo; in-order traversal gives a sorted listing for free |
+| M5 | Loyalty and Rewards Service | Doubly Linked List | KY | no single dominant operation -> general-purpose collection; O(1) insert/remove after locating + two-way traversal, supports the many member features |
+| M6 | Summary Reports | - | All Members | algorithms instead of a new ADT: each member hand-writes one sort + search/filter for their own module's report |
 
-> notes: this module description is just a short one. For more information, refer to assignment question
+> notes: the ADT is just suggestion, you may change it yourself if you think the other ADT is better, but remember each member should not take the same ADT
 
 ## Timeline
 
 > Submission Date: Week 10 Friday 11.59 pm.
 
+- Freeze shared data contracts (Booking fields, Room Status, tier values): Week 3
 - Code Writing: Week 3 - Week 8
 - Early Code Integration: Week 6
-- Final Code Integration & Documentation: Week 9
+- Final Code Integration & Documentation (NetBeans project + ReadMe.txt): Week 9
 - Last Checking: Week 10
+- Demo Prep (each member: own ADT reasoning + complexity): Week 10 - Week 11
+
+## Spec Compliance Checklist (for report / code review)
+
+- [ ] **No Java Collections Framework**: never use `java.util` ArrayList / HashMap / LinkedList / Stack etc.; for collections outside your scope, use a teammate's ADT or the course sample code
+- [ ] ADTs not written by you / adapted: **acknowledge the source** at the top of the Java interface (spec requirement)
+- [ ] Author name as a comment at the top of every class you wrote
+- [ ] Utility classes may contain static methods + static variables only (check InputHelper / OutputHelper)
+- [ ] ECB constraints: Boundary <-> actor/control; Control <-> boundary/entity/other controls; **Entity may only know other entities**
+- [ ] Only validations that invoke ADT methods are required (spec wording); UI earns no marks — don't over-invest
+- [ ] Deliverables: NetBeans project + data files + ReadMe.txt + AI Usage Disclosure Form
+- [ ] AI policy is Yellow: no AI-generated modules/core code; rubric "Overall Solution" penalizes AI usage; write core ADT + module logic yourself and be able to explain every line at the demo
+- [ ] Team component submits and is assessed on **ONE** ADT only -> submit the Max-Heap
+- [ ] Java naming convention (Camel Case)
 
 ---
 
@@ -66,72 +81,13 @@
 
 ```
 src/
-├── Main.java                         // Entry point
-│
-├── shared/                           // Shared by everyone (notice in group when changed)
-│   ├── adt/                          // Generic ADT interfaces
-│   │   ├── QueueInterface.java
-│   │   ├── HeapInterface.java
-│   │   ├── StackInterface.java
-│   │   ├── HashInterface.java
-│   │   └── ListInterface.java
-│   └── util/                         // Small helpers
-│       └── InputHelper.java
-│
-├── booking/                          // Module 1 - Queue
-│   ├── boundary/
-│   │   └── BookingUI.java            // CLI menu and user I/O for booking
-│   ├── control/
-│   │   └── BookingManager.java       // Booking business logic
-│   ├── entity/
-│   │   ├── Booking.java              // Booking data object
-│   │   └── BookingQueue.java         // implements QueueInterface
-│   └── report/
-│       └── BookingReport.java        // Search & sort + report for this module
-│
-├── allocation/                       // Module 2 - Heap
-│   ├── boundary/
-│   │   └── AllocationUI.java
-│   ├── control/
-│   │   └── AllocationManager.java
-│   ├── entity/
-│   │   ├── VipGuest.java
-│   │   └── PriorityHeap.java         // implements HeapInterface
-│   └── report/
-│       └── AllocationReport.java
-│
-├── housekeeping/                     // Module 3 - Stack
-│   ├── boundary/
-│   │   └── HousekeepingUI.java
-│   ├── control/
-│   │   └── HousekeepingManager.java
-│   ├── entity/
-│   │   ├── Task.java
-│   │   └── TaskStack.java            // implements StackInterface
-│   └── report/
-│       └── HousekeepingReport.java
-│
-├── frontdesk/                        // Module 4 - Hash
-│   ├── boundary/
-│   │   └── FrontDeskUI.java
-│   ├── control/
-│   │   └── FrontDeskManager.java
-│   ├── entity/
-│   │   ├── Reservation.java
-│   │   └── ConfirmationHashMap.java  // implements HashInterface
-│   └── report/
-│       └── FrontDeskReport.java
-│
-└── loyalty/                          // Module 5 - List
-    ├── boundary/
-    │   └── LoyaltyUI.java
-    ├── control/
-    │   └── LoyaltyManager.java
-    ├── entity/
-    │   ├── Member.java
-    │   └── MemberList.java           // implements ListInterface
-    └── report/
-        └── LoyaltyReport.java
+├── Main.java          // Entry point
+├── adt/               // ADT interfaces + implementations (team ADT: MaxHeap)
+├── entity/            // Data classes (Serializable)
+├── boundary/          // UI layer - console I/O only
+├── control/           // Logic layer - business rules, module menus, reports
+├── dao/               // Hardcode data needed to RAM
+└── utility/           // Static-only helpers
 ```
 
 ## Shared Data Definitions (共享数据定义)
@@ -140,9 +96,10 @@ src/
 
 ### Room Status
 
-- who handle: module 3 (housekeeping) (qw)
+- who handle: module 3 (housekeeping) (pujin)
 - read by: module 2 (allocation) and module 1 (booking) for room allocation 
-- data: `Available, Occupied, Dirty, Clean, Out-of-Service`
+- occupancy: `Available, Occupied, Out-of-Service`
+- housekeeping pipeline (spec wording): `Dirty, Cleaning In Progress, Inspected, Ready for Check-In`
 
 ### Room Types
 
@@ -150,19 +107,20 @@ src/
 
 ### Booking / Reservation
 
-- who handle: module 1 (booking) (pujin)
+- who handle: module 1 (booking) (yz)
 - read by: module 4 (front-desk), report
 - fields: `confirmationNo, guestName, roomNo, checkIn, checkOut, status`
+- `confirmationNo` is an 8-digit number, generate randomly (sequential keys would degenerate M4's BST into a linked list)
 
 ### Booking Status
 
-- who handle: module 1 (booking) (pujin)
+- who handle: module 1 (booking) (yz)
 - data: `Pending, Confirmed, Checked-in, Checked-out, Cancelled`
 
 ### Confirmation Number
 
-- who handle: module 1 (booking) (pujin)
-- read by: module 4 (front-desk) for O(1) search
+- who handle: module 1 (booking) (yz)
+- read by: module 4 (front-desk) for BST search (O(log n) average)
 - format: 8-digit numeric, unique -> e.g. `10042087`
 
 ### Member
@@ -180,11 +138,11 @@ src/
 
 - who handle: module 5 (loyalty) (ky)
 - read by: module 2 (allocation) for priority ordering
-- data: `Silver, Gold, Platinum` (priority 2, 1, 0 -> lower wins) (platinum = 0)
+- data: `Silver, Gold, Platinum` (priority 1, 2, 3 -> higher wins, consistent with M2's additive priority key) (Platinum = 3)
 
 ### Guest
 
-- who handle: module 1 (booking) (pujin)
+- who handle: module 1 (booking) (yz)
 - note: walk-in guest, NOT a loyalty member (no tier)
 - fields: `name, icOrPassport, contactNo`
 
