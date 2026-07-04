@@ -1,4 +1,4 @@
-package shared.util;
+package utility;
 
 import java.util.Scanner;
 

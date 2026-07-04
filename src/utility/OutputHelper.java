@@ -1,4 +1,4 @@
-package shared.util;
+package utility;
 
 public class OutputHelper {
     private static final String resetANSI = "\033[0m";

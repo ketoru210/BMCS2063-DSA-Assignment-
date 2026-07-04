@@ -1,4 +1,4 @@
-package shared.util;
+package utility;
 
 /**
  * A single selectable entry in a console menu.

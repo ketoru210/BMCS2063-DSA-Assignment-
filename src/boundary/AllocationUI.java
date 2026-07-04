@@ -1,7 +1,7 @@
-package allocation.boundary;
+package boundary;
 
-import shared.util.Menu;
-import shared.util.MenuItem;
+import utility.Menu;
+import utility.MenuItem;
 
 /**
  * Boundary: CLI for VIP & Loyalty Tier-Priority Room Allocation

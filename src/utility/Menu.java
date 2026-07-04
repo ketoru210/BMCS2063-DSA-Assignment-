@@ -1,4 +1,4 @@
-package shared.util;
+package utility;
 
 /**
  * Generic console-menu driver: clears the screen, prints the title and options,

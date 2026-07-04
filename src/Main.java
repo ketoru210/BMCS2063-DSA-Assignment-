@@ -1,7 +1,7 @@
-import allocation.boundary.AllocationUI;
-import shared.util.InputHelper;
-import shared.util.Menu;
-import shared.util.MenuItem;
+import boundary.AllocationUI;
+import utility.InputHelper;
+import utility.Menu;
+import utility.MenuItem;
 
 public class Main {
     private static final String TITLE = "TARUMT Resorts";
