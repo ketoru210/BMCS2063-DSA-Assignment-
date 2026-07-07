@@ -1,4 +1,5 @@
 import boundary.AllocationUI;
+import boundary.LoyaltyUI;
 import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
@@ -24,7 +25,7 @@ public class Main {
                 () -> System.out.println("//TODO: Redirect to Module 4")
         ),
         LOYALTY("Loyalty and Rewards Service",
-                () -> System.out.println("//TODO: Redirect to Module 5")
+                () -> new LoyaltyUI().run()
         );
 
         private final String label;
