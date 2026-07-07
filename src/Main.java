@@ -1,4 +1,5 @@
 import boundary.AllocationUI;
+import boundary.HousekeepingUI;
 import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
@@ -18,7 +19,7 @@ public class Main {
                 () -> new AllocationUI().run()
         ),
         HOUSEKEEPING("Housekeeping and Task Log",
-                () -> System.out.println("//TODO: Redirect to Module 3")
+                () -> new HousekeepingUI().run()
         ),
         FRONT_DESK("Front-Desk Service",
                 () -> System.out.println("//TODO: Redirect to Module 4")
