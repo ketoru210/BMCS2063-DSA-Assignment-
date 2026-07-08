@@ -183,3 +183,9 @@ Please Select >
 - use `[n]` for option
 - must provide `[0]` for exit/go back
 - use `>` for prompt
+
+## Class Diagram
+
+### Analysis Phase
+
+![DSA_class_diagram.png](assets/DSA_class_diagram.png)
