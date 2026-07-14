@@ -3,13 +3,16 @@
 BMCS2063 Data Structures and Algorithms — Assignment 202605.
 
 A console-based reservation and room-optimization prototype for TARUMT Resorts,
-a luxury hospitality chain. The system is driven by one shared Master Guest
-Registry and demonstrates both linear and non-linear Abstract Data Types (ADTs)
-together with explicit searching and sorting algorithms.
+a luxury hospitality chain. The whole system is built around **one self-defined
+team ADT** — `CollectionInterface<T>`, a *policy-ordered collection* whose
+`remove()` / `getFirst()` operate on the element each implementation's
+organizing policy designates as *first* — implemented differently by every
+module, alongside hand-written searching and sorting algorithms.
 
-> No Java Collections Framework is used — all collections implement the ADT interfaces in `adt/`
+> No Java Collections Framework is used — every collection in the system is an
+> implementation of the single team ADT interface in `adt/`
 
-> 内部设计细节、数据约定与分工，见 [plan.md](plan.md)。
+> 内部设计细节、接口契约、数据约定与分工，见 [plan.md](plan.md)。
 
 ## Architecture
 
@@ -23,30 +26,33 @@ Flow: `Boundary → Control → Entity`, with shared utility classes used across
 
 ## Modules
 
-| # | Module | ADT | Owner |
-|---|--------|-----|-------|
-| 1 | Walk-In Registrations & Standard Booking | Deque (FIFO) | YZ |
-| 2 | VIP & Loyalty Tier-Priority Room Allocation | Max-Heap (**team ADT**) | YZ |
-| 3 | Housekeeping and Task Log | 2 × LinkedStack (undo/redo) | Pujin |
-| 4 | Front-Desk Service | BST (O(log n) search) | QW |
-| 5 | Loyalty and Rewards Service | Doubly Linked List | KY |
-| 6 | Summary Reports (Revenue & Occupancy) | Search & Sort | All |
+| # | Module | Team-ADT implementation | Policy ("first" element) | Owner |
+|---|--------|-------------------------|--------------------------|-------|
+| 2 | VIP & Loyalty Tier-Priority Room Allocation | `MaxHeap` | highest priority | YZ |
+| 3 | Housekeeping and Task Log | 2 × `LinkedStack` (undo/redo) | most recently pushed | Pujin |
+| 4 | Front-Desk Service | `BinarySearchTree` (O(log n) search) | smallest key | QW |
+| 5 | Loyalty and Rewards Service | `DoublyLinkedList` | head (insertion order) | KY |
+| 6 | Summary Reports (Revenue & Occupancy) | hand-written search & sort | — | All |
+
+> Module 1 (Walk-In Registration & Standard Booking) was dropped —
+> booking data is seeded to RAM via `dao/` instead.
 
 ## Project Structure
 
 ```
 src/
 ├── Main.java          // Entry point
-├── adt/               // ADT interfaces + implementations (team ADT: MaxHeap)
-├── entity/            // Data classes (Serializable)
+├── adt/               // Team ADT interface (CollectionInterface) + 4 implementations
+├── entity/            // Data classes (POJO, Serializable)
 ├── boundary/          // UI layer - console I/O only
 ├── control/           // Logic layer - business rules, module menus, reports
-├── dao/               // Hardcode data needed to RAM
+├── dao/               // Hardcoded seed data to RAM (incl. bookings)
 └── utility/           // Static-only helpers
 ```
 
 Packages are organized by ECB layer, following the course's ECBDemo reference
-project; every class carries an `@author` tag.
+project; every class carries an `@author` tag (the ADT interface is co-authored
+by the whole team).
 
 ## Build & Run
 
@@ -61,11 +67,12 @@ java -jar dist/*.jar   # run
 
 ## Team
 
-| Member | Modules |
-|--------|---------|
-| YZ     | 1 (Booking), 2 (Allocation) |
+| Member | Module |
+|--------|--------|
+| YZ     | 2 (Allocation) |
+| Pujin  | 3 (Housekeeping) |
 | QW     | 4 (Front-Desk) |
 | KY     | 5 (Loyalty) |
-| Pujin  | 3 (Housekeeping) |
 
-Each member also delivers the report (search & sort) for their own module(s).
+Each member implements one class of the team ADT and also delivers the
+report (search & sort) for their own module.

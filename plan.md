@@ -6,11 +6,11 @@
 
 ## Modules Break Down
 
-> Total 6 modules
+> Total 5 modules (M1 dropped)
 
-| *No.* | *Modules* | *Suggest ADT* | *Assigned to* | *Reason* |
+| *No.* | *Modules* | *Implementation (of team ADT)* | *Assigned to* | *Reason* |
 |------|---|---|---|---|
-| M2 | VIP & Loyalty Tier-Priority Room Allocation | Max-Heap (**team ADT**) | YZ | not covered in the course (originality marks); insert reorganizes automatically so the highest priority is always at the root — exactly the spec wording; priority = static key `tier*W - arrivalSeq*r`, so waiting-time aging needs no re-heapify |
+| M2 | VIP & Loyalty Tier-Priority Room Allocation | `MaxHeap` | YZ | not covered in the course (originality marks); insert reorganizes automatically so the highest priority is always at the root — exactly the spec wording; priority = static key `tier*W - arrivalSeq*r`, so waiting-time aging needs no re-heapify |
 | M3 | Housekeeping and Task Log | 2 * LinkedStack | Pujin | LIFO matches undo semantics; O(1) push/pop = spec's "roll back instantly"; second stack enables redo (cleared on new action) |
 | M4 | Front-Desk Service | Binary Search Tree (BST) / harder: AVL Tree | QW | tutor advised against hash; O(log n) search on the unique comparable confirmationNo; in-order traversal gives a sorted listing for free |
 | M5 | Loyalty and Rewards Service | Doubly Linked List | KY | no single dominant operation -> general-purpose collection; O(1) insert/remove after locating + two-way traversal, supports the many member features |
@@ -147,11 +147,11 @@ public interface CollectionInterface<T extends Comparable<T>> {
 ```
 src/
 ├── Main.java          // Entry point
-├── adt/               // ADT interfaces + implementations (team ADT: MaxHeap)
+├── adt/               // Team ADT interface (CollectionInterface) + 4 implementations
 ├── entity/            // Data classes (Serializable)
 ├── boundary/          // UI layer - console I/O only
 ├── control/           // Logic layer - business rules, module menus, reports
-├── dao/               // Hardcode data needed to RAM
+├── dao/               // Hardcoded seed data to RAM (incl. bookings — M1 dropped)
 └── utility/           // Static-only helpers
 ```
 
@@ -162,7 +162,7 @@ src/
 ### Room Status
 
 - who handle: module 3 (housekeeping) (pujin)
-- read by: module 2 (allocation) and module 1 (booking) for room allocation 
+- read by: module 2 (allocation) for room allocation
 - occupancy: `Available, Occupied, Out-of-Service`
 - housekeeping pipeline (spec wording): `Dirty, Cleaning In Progress, Inspected, Ready for Check-In`
 
@@ -172,19 +172,19 @@ src/
 
 ### Booking / Reservation
 
-- who handle: module 1 (booking) (yz)
+- who handle: `dao/` seed data（M1 dropped，spec 允许 hard-coded entity values）
 - read by: module 4 (front-desk), report
 - fields: `confirmationNo, guestName, roomNo, checkIn, checkOut, status`
 - `confirmationNo` is an 8-digit number, generate randomly (sequential keys would degenerate M4's BST into a linked list)
 
 ### Booking Status
 
-- who handle: module 1 (booking) (yz)
+- who handle: `dao/` seed data
 - data: `Pending, Confirmed, Checked-in, Checked-out, Cancelled`
 
 ### Confirmation Number
 
-- who handle: module 1 (booking) (yz)
+- who handle: `dao/` seed data
 - read by: module 4 (front-desk) for BST search (O(log n) average)
 - format: 8-digit numeric, unique -> e.g. `10042087`
 
@@ -207,7 +207,7 @@ src/
 
 ### Guest
 
-- who handle: module 1 (booking) (yz)
+- who handle: `dao/` seed data
 - note: walk-in guest, NOT a loyalty member (no tier)
 - fields: `name, icOrPassport, contactNo`
 
@@ -228,11 +228,10 @@ src/
 (^_^)/ Welcome!
 
 [0] Exit
-[1] Walk-In Registration & Standard Booking Procedure
-[2] Vip & Loyalty Tier-Priority Room Allocation
-[3] Housekeeping and Task Log
-[4] Front-Desk Service
-[5] Loyalty and Rewards Service
+[1] Vip & Loyalty Tier-Priority Room Allocation
+[2] Housekeeping and Task Log
+[3] Front-Desk Service
+[4] Loyalty and Rewards Service
 
 Please Select > 
 ```
