@@ -12,9 +12,6 @@ public class Main {
         EXIT("Exit",
                 () -> {}
         ),
-        WALK_IN("Walk-In Registration & Standard Booking Procedure",
-                () -> System.out.println("//TODO: Redirect to Module 1")
-        ),
         VIP_PRIORITY("VIP & Loyalty Tier-Priority Room Allocation",
                 () -> new AllocationUI().run()
         ),

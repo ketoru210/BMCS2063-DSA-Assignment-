@@ -1,10 +1,10 @@
 package utility;
 
 public class OutputHelper {
-    private static final String resetANSI = "\033[0m";
-    private static final String redANSI  = "\033[31m";
+    private static final String resetANSI = "\033[0m" ;
+    private static final String redANSI   = "\033[31m";
     private static final String greenANSI = "\033[32m";
-    private static final String blueANSI = "\033[34m";
+    private static final String blueANSI  = "\033[34m";
 
     public static void printTitle(String title) {
         System.out.println("=== " + title + " ===");
