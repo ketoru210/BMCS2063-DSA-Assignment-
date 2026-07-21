@@ -66,11 +66,28 @@ public class HousekeepingUI {
     }
 
     private void viewRooms() {
-        OutputHelper.printBlue("\n--- Current Room List ---");
         Room[] rooms = control.getAllRooms();
+        String divider = "+---------+----------+------------------+------------------------+";
+        
+        OutputHelper.printBlue("\n--- Current Room List ---");
+        System.out.println(divider);
+        // Table Header
+        System.out.printf("| %-7s | %-8s | %-16s | %-22s |%n", 
+                "Room No", "Type", "Occupancy", "Housekeeping Status");
+        System.out.println(divider);
+        
+        // Table Data
         for (int i = 0; i < rooms.length; i++) {
-            System.out.println(rooms[i].toString());
+            Room r = rooms[i];
+            if (r != null) {
+                System.out.printf("| %-7s | %-8s | %-16s | %-22s |%n", 
+                    r.getRoomNo(), 
+                    r.getRoomType(), 
+                    r.getOccupancyStatus(), 
+                    r.getHousekeepingStatus());
+            }
         }
+        System.out.println(divider + "\n");
     }
 
     private void updateStatusUI() {
@@ -82,25 +99,40 @@ public class HousekeepingUI {
             return;
         }
 
-        System.out.println("\nCurrent Status: " + room.getHousekeepingStatus());
+        String currentStatus = room.getHousekeepingStatus();
+        System.out.println("\nCurrent Status: " + currentStatus);
+        
+        // State Machine Business Logic: Enforce strict valid sequential progress
+        String[] validNextStatuses;
+        switch (currentStatus) {
+            case "Dirty":
+                validNextStatuses = new String[]{"Cleaning In Progress"};
+                break;
+            case "Cleaning In Progress":
+                validNextStatuses = new String[]{"Inspected"};
+                break;
+            case "Inspected":
+                // FIX APPLIED HERE: Allow the room to pass (Ready) or fail (Dirty) inspection
+                validNextStatuses = new String[]{"Ready for Check-In", "Dirty"};
+                break;
+            case "Ready for Check-In":
+                validNextStatuses = new String[]{"Dirty"};
+                break;
+            default:
+                validNextStatuses = new String[]{"Dirty", "Cleaning In Progress", "Inspected", "Ready for Check-In"};
+                break;
+        }
+
         System.out.println("Select New Status:");
         
-        String[] statuses = {
-            "Dirty", 
-            "Cleaning In Progress", 
-            "Inspected", 
-            "Ready for Check-In"
-        };
-        
-        // Print options 1 to 4 to avoid 0 index confusion for statuses
-        for (int i = 0; i < statuses.length; i++) {
-            System.out.println("[" + (i + 1) + "] " + statuses[i]);
+        for (int i = 0; i < validNextStatuses.length; i++) {
+            System.out.println("[" + (i + 1) + "] " + validNextStatuses[i]);
         }
         
         int choice = InputHelper.readInt("\nSelect Status > ");
         
-        if (choice >= 1 && choice <= statuses.length) {
-            String newStatus = statuses[choice - 1];
+        if (choice >= 1 && choice <= validNextStatuses.length) {
+            String newStatus = validNextStatuses[choice - 1];
             control.updateRoomStatus(roomNo, newStatus);
             OutputHelper.printOK("Success: Room " + roomNo + " updated to " + newStatus);
         } else {

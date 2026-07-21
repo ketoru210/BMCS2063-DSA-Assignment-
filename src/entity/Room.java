@@ -18,9 +18,16 @@ public class Room implements Serializable {
         this.housekeepingStatus = housekeepingStatus;
     }
 
+    // --- Getters ---
     public String getRoomNo() { return roomNo; }
+    
+    // NEW: Added missing getters for the UI table
+    public String getRoomType() { return roomType; }
+    public String getOccupancyStatus() { return occupancyStatus; }
+    
     public String getHousekeepingStatus() { return housekeepingStatus; }
     
+    // --- Setters ---
     public void setHousekeepingStatus(String housekeepingStatus) { 
         this.housekeepingStatus = housekeepingStatus; 
     }

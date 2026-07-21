@@ -1,7 +1,6 @@
 package control;
 
-import adt.LinkedStack;
-import adt.StackInterface;
+import adt.LinkedStack; // StackInterface import is removed
 import dao.RoomDAO;
 import entity.HousekeepingTask;
 import entity.Room;
@@ -11,8 +10,9 @@ import entity.Room;
  */
 public class HousekeepingControl {
     
-    private StackInterface<HousekeepingTask> undoStack;
-    private StackInterface<HousekeepingTask> redoStack;
+    // Changed to use the concrete LinkedStack class per Iron Rule #1
+    private LinkedStack<HousekeepingTask> undoStack;
+    private LinkedStack<HousekeepingTask> redoStack;
     private RoomDAO roomDAO;
 
     public HousekeepingControl() {
