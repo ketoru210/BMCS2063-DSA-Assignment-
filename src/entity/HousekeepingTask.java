@@ -1,9 +1,11 @@
 package entity;
 
+import java.io.Serializable;
+
 /**
  * @author Pujin
  */
-public class HousekeepingTask implements Comparable<HousekeepingTask> {
+public class HousekeepingTask implements Comparable<HousekeepingTask>, Serializable {
     
     private Room room;
     private String previousStatus;

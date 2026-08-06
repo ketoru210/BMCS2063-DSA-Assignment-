@@ -62,10 +62,10 @@ public class LinkedStack<T extends Comparable<T>> implements CollectionInterface
 
     @Override
     public boolean remove(T anEntry) {
-        if (isEmpty()) return false;
+        if (anEntry == null || isEmpty()) return false;
 
         // If the element to remove is at the top
-        if (topNode.data.compareTo(anEntry) == 0) {
+        if (topNode.data != null && topNode.data.compareTo(anEntry) == 0) {
             remove();
             return true;
         }
@@ -73,7 +73,7 @@ public class LinkedStack<T extends Comparable<T>> implements CollectionInterface
         // Traverse to find the element
         Node currentNode = topNode;
         while (currentNode.next != null) {
-            if (currentNode.next.data.compareTo(anEntry) == 0) {
+            if (currentNode.next.data != null && currentNode.next.data.compareTo(anEntry) == 0) {
                 currentNode.next = currentNode.next.next; // Bypass the node
                 numberOfEntries--;
                 return true;
@@ -106,9 +106,10 @@ public class LinkedStack<T extends Comparable<T>> implements CollectionInterface
 
     @Override
     public T search(T probe) {
+        if (probe == null) return null;
         Node currentNode = topNode;
         while (currentNode != null) {
-            if (currentNode.data.compareTo(probe) == 0) {
+            if (currentNode.data != null && currentNode.data.compareTo(probe) == 0) {
                 return currentNode.data;
             }
             currentNode = currentNode.next;
