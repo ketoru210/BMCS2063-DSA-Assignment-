@@ -1,6 +1,7 @@
 package dao;
 
 import entity.Room;
+import entity.RoomType;
 
 /**
  * @author Pujin
@@ -8,10 +9,10 @@ import entity.Room;
  */
 public class RoomDAO {
     private static final Room[] rooms = new Room[]{
-        new Room("A-101", "Single", "Available", "Dirty"),
-        new Room("A-102", "Deluxe", "Occupied", "Cleaning In Progress"),
-        new Room("B-201", "Suite", "Out-of-Service", "Inspected"),
-        new Room("B-202", "Suite", "Available", "Ready for Check-In")
+        new Room("A-101", RoomType.SINGLE, "Available", "Dirty"),
+        new Room("A-102", RoomType.DELUXE, "Occupied", "Cleaning In Progress"),
+        new Room("B-201", RoomType.SUITE, "Out-of-Service", "Inspected"),
+        new Room("B-202", RoomType.SUITE, "Available", "Ready for Check-In")
     };
 
     public RoomDAO() {

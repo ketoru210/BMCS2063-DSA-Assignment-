@@ -1,6 +1,6 @@
 package control;
 
-import adt.LinkedStack; // StackInterface import is removed
+import adt.LinkedStack;
 import dao.RoomDAO;
 import entity.HousekeepingTask;
 import entity.Room;
