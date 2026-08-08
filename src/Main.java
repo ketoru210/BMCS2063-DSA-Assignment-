@@ -1,4 +1,7 @@
 import boundary.AllocationUI;
+import boundary.HousekeepingUI;
+import control.AllocationControl;
+import control.BookingControl;
 import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
@@ -7,18 +10,24 @@ public class Main {
     private static final String TITLE = "TARUMT Resorts";
     private static final String BANNER = "(^_^)/ Welcome!";
 
+    // Wired once, here. Each control loads its own module's DAO and is then the
+    // single way in for everybody else, so no two modules hold their own copy of
+    // the same data — and a screen's state survives being left and re-entered.
+    private static final BookingControl BOOKINGS = new BookingControl();
+
+    private static final AllocationUI ALLOCATION_UI =
+            new AllocationUI(new AllocationControl(BOOKINGS));
+    private static final HousekeepingUI HOUSEKEEPING_UI = new HousekeepingUI();
+
     private enum MenuOption implements MenuItem {
         EXIT("Exit",
                 () -> {}
         ),
-        WALK_IN("Walk-In Registration & Standard Booking Procedure",
-                () -> System.out.println("//TODO: Redirect to Module 1")
-        ),
         VIP_PRIORITY("VIP & Loyalty Tier-Priority Room Allocation",
-                () -> new AllocationUI().run()
+                () -> ALLOCATION_UI.run()
         ),
         HOUSEKEEPING("Housekeeping and Task Log",
-                () -> System.out.println("//TODO: Redirect to Module 3")
+                () -> HOUSEKEEPING_UI.run()
         ),
         FRONT_DESK("Front-Desk Service",
                 () -> System.out.println("//TODO: Redirect to Module 4")
