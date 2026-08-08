@@ -1,10 +1,12 @@
 package entity;
 
+import java.io.Serializable;
+
 /**
  * @author Kang Yong
  */
 
-public class Promotion implements Comparable<Promotion> {
+public class Promotion implements Serializable, Comparable<Promotion> {
     private String label;
     private String description;
     private String startDate;
@@ -24,6 +26,14 @@ public class Promotion implements Comparable<Promotion> {
     @Override
     public int compareTo(Promotion promotion) {
         return startDate.compareTo(promotion.startDate);
+    }
+    //Equals method
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) return true;
+        if (object == null || getClass() != object.getClass()) return false;
+        Promotion other = (Promotion) object;
+        return label.equals(other.label) && startDate.equals(other.startDate);
     }
     //To string method
     @Override

@@ -3,6 +3,14 @@ package adt;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+/**
+ * Module 5 implementation of the team ADT, backed by a doubly linked chain.
+ * <p>
+ * Organizing policy: <b>head first</b>. {@code add} appends at the tail, so the
+ * traversal order given by {@code getIterator()} is insertion order.
+ *
+ * @author Kang Yong
+ */
 public class DoublyLinkedList<T extends Comparable<T>> implements CollectionInterface<T>{
     private Node firstNode;
     private Node lastNode;
