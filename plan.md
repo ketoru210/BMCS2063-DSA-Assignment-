@@ -155,32 +155,82 @@ src/
 └── utility/           // Static-only helpers
 ```
 
+## 数据归属：DAO 私有，Control 共享
+
+跨模块拿数据只有一条路：
+
+```
+自己的 DAO ──> 自己的 Control ──> 别的模块
+```
+
+三条规则：
+
+1. **一个 DAO 只被它自己模块的 control 读。** 不要 `new 别人的DAO()`。
+   M2 要 booking，就跟 `BookingControl` 要，不碰 `BookingDAO`。
+2. **每个模块的 control 全程只有一个实例**，在 `Main` 里 `static final` 建好，
+   往下注入给 UI 和需要它的其他 control。
+3. **Control 在构造函数里从自己的 DAO 播种一次**，之后集合就归它管。
+
+第 2 条不是可选的。对象唯一靠 DAO 的 `static` 数组就够了，但**集合**唯一只能靠
+单实例——两个 `BookingControl` 各自有一棵 BST，M4 新增一张 booking，M2 那棵树里
+没有，照样不同步。顺带一个好处：退出菜单再进来，模拟时钟和队列不会被重置。
+
+当前接线（`Main`）：
+
+```java
+private static final BookingControl BOOKINGS = new BookingControl();
+private static final AllocationUI ALLOCATION_UI =
+        new AllocationUI(new AllocationControl(BOOKINGS));
+```
+
+`control/BookingControl.java` 是 YZ 写的**占位**，内部先用数组；QW 换成 BST，
+保留 `getAllBookings()` / `findByConfirmationNo()` 两个方法名，要改先说。
+
+`LoyaltyControl` 同理：构造函数里 `new MemberDAO().getAllMembers()` 播进
+`DoublyLinkedList<Member>`，**不要自己 `new Member(...)` 造一批新的**——那样
+M5 给客人升级，M2 队列里读到的还是旧 tier，重排功能直接失效。
+
 ## Shared Data Definitions (共享数据定义)
 
-> 我先放一些，有要改的提意见
+> 下面每一条都至少有第二个模块在读，改之前先在群里说一声。
+> 只列**跨模块要知道的**字段——模块内部字段（积分明细、账号密码等）不写进来。
+
+### Room
+
+- who handle: module 3 (housekeeping) (pujin)
+- read by: module 2 (allocation)
+- fields: `roomNo, roomType, occupancyStatus, housekeepingStatus`
+- ⚠️ 两处待改：`roomType` 由 `String` 改成 `RoomType` enum；补一个 `setOccupancyStatus`
 
 ### Room Status
 
-- who handle: module 3 (housekeeping) (pujin)
-- read by: module 2 (allocation) for room allocation
-- occupancy: `Available, Occupied, Out-of-Service`
+- occupancy: `Available, Reserved, Occupied, Out-of-Service`
+  - `Reserved` = 已分房、客人还没到。没有这个值，M2 判断不出房已被占，**同一间房会被分配两次**
 - housekeeping pipeline (spec wording): `Dirty, Cleaning In Progress, Inspected, Ready for Check-In`
+- M2 只在 `Available` **且** `Ready for Check-In` 时才分配该房
 
-### Room Types
+### Room Type
 
-- data: `Single, Suite, Deluxe`
+- data + 每晚房价（RM）：`SINGLE 200.00`、`DELUXE 350.00`、`SUITE 700.00`
+- 故意不等距——等差的话 revenue 排名恒等于 occupancy 排名乘一个常数，M6 报表就算不出东西了
 
 ### Booking / Reservation
 
 - who handle: `dao/` seed data（M1 dropped，spec 允许 hard-coded entity values）
-- read by: module 4 (front-desk), report
-- fields: `confirmationNo, guestName, roomNo, checkIn, checkOut, status`
+- read by: module 4 (front-desk), module 2 (allocation), report
+- fields: `confirmationNo, member, roomType, room, checkIn, checkOut, status`
+  - `member` — `Member` 引用；姓名走 `getMember().getName()`，不另存一份
+  - `roomType` — 客人**要求**的房型（营收按这个算，不是按分到的房）
+  - `room` — **nullable**，`null` = 尚未分房，由 M2 写入
+  - `checkIn` / `checkOut` — `LocalDate`（M6 要算住了几晚，存 String 就算不了）
+- `compareTo` 按 `confirmationNo`——M4 的 BST 键，**锁死不改**
 - `confirmationNo` is an 8-digit number, generate randomly (sequential keys would degenerate M4's BST into a linked list)
 
 ### Booking Status
 
-- who handle: `dao/` seed data
+- who handle: `dao/` seed data 播种，之后由 module 4 写
 - data: `Pending, Confirmed, Checked-in, Checked-out, Cancelled`
+- **M2 分房不改 status**（分房 ≠ 入住）；只有 `Confirmed` 且 `room == null` 的 booking 进 M2 的队列
 
 ### Confirmation Number
 
@@ -192,29 +242,52 @@ src/
 
 - who handle: module 5 (loyalty) (ky)
 - read by: module 2 (allocation) for tier priority
-- fields: `memberId, name, tier, points`
+- 公用 fields: `memberID, name, currentTier`
+- 非会员也是一个 `Member`，`currentTier = GUEST`——单一实体，不引入 null
 
 ### Member ID
 
 - who handle: module 5 (loyalty) (ky)
-- format: `M` + 5 digits -> e.g. `M00231`
+- format: `M` + 5 digits，由 `Member` 用一个 static 计数器生成 -> `M00001`, `M00002`, ...
+- **终身不变**：入会/升级只改 `currentTier`。换 ID 会让所有指向他的 booking 全部失效
+- ⚠️ 具体数值取决于构造顺序，**种子数据里不要写死 memberID**，用 `MemberDAO.findByUsername(...)`
 
 ### Loyalty Tier
 
 - who handle: module 5 (loyalty) (ky)
 - read by: module 2 (allocation) for priority ordering
-- data: `Silver, Gold, Platinum` (priority 1, 2, 3 -> higher wins, consistent with M2's additive priority key) (Platinum = 3)
+- 类型：`entity.LoyaltyTier`（顶层 enum）
+- data + 权重：`GUEST 0, SILVER 30, GOLD 60, PLATINUM 90`
+- **权重的单位是分钟**：aging 速率 k = 1 分/分钟，所以「每升一级 = 抵 30 分钟的等待」
+- ⚠️ 不要和 `entity.Tier` 搞混——那是 M5 的**每季度积分记录**（`loyaltyTier, season, seasonalPoints`），
+  是一条历史，不是等级本身
 
-### Guest
+### Allocation（M2 内部，列在这里供集成参考）
 
-- who handle: `dao/` seed data
-- note: walk-in guest, NOT a loyalty member (no tier)
-- fields: `name, icOrPassport, contactNo`
+- who handle: module 2 (allocation) (yz)
+- fields: `booking, special, arrivalMinute, seq, invariantPriority`
+- `SpecialCategory`：`NONE 0, GOODWILL 10, HABITABILITY 20, COMPLIANCE 30, LIFE_SAFETY 40`
+- 排序三层：`special 权重` → `invariantPriority`（仅两边都是 NONE 时） → `seq` **反向**（先到先得）
+- `invariantPriority = tier 权重 − arrivalMinute`，control 在 `add()` 前算好，此后不重算
+- 时钟是**可手动推进的模拟时钟**，不是墙上时间——真实时钟下 demo 全程只有几分钟，交叉点演示不出来
+
+### 字段写入权
+
+| 字段 | 谁写 | 谁读 |
+|---|---|---|
+| `Booking.room` | M2 | M4, M6 |
+| `Booking.status` | M4 | M2, M6 |
+| `Room.occupancyStatus` | M2 (→Reserved)、M4 (→Occupied/→Available)、M3 (↔Out-of-Service) | M2 |
+| `Room.housekeepingStatus` | M3 | M2 |
+| `Member.currentTier` | M5 | M2 |
+
+- check-out 后房间要变脏：M4 的 control 调用 M3 的 `HousekeepingControl.markDirty(room)`。
+  control 调 control 是 ECB 允许的，**不要绕过去直接 setter**
 
 ### Format Conventions
 
 - Room No.: `zone-floorRoom` -> e.g. `A-1203`
-- Date: `dd-MM-yyyy` -> e.g. `26-06-2026`
+- Date: `dd-MM-yyyy` -> e.g. `26-06-2026`（**显示格式**；存储用 `LocalDate`）
 - Money: `RM` + 2 decimals floating point number -> e.g. `RM 250.00`
 
 # Implementation Details
