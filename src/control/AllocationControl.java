@@ -31,23 +31,23 @@ public class AllocationControl {
     // concrete type on purpose: the heap's add-on methods stay reachable
     private final MaxHeap<Allocation> queue = new MaxHeap<>();
 
-    private final BookingControl bookings;
+    private final BookingControl bookingControl;
 
-    private int nextSeq = 1;
+    private int nextEntryNo = 1;
     private int clockMinute;
 
-    public AllocationControl(BookingControl bookings) {
-        this.bookings = bookings;
+    public AllocationControl(BookingControl bookingControl) {
+        this.bookingControl = bookingControl;
         clockMinute = AllocationDAO.getSeedNowMinute();
 
-        Allocation[] seeded = new AllocationDAO().getAllRequests(bookings.getAllBookings());
+        Allocation[] seeded = new AllocationDAO().getAllRequests(bookingControl.getAllBookings());
         for (int i = 0; i < seeded.length; i++) {
             if (seeded[i] == null) {
                 continue;
             }
             admit(seeded[i]);
-            if (seeded[i].getSeq() >= nextSeq) {
-                nextSeq = seeded[i].getSeq() + 1;
+            if (seeded[i].getEntryNo() >= nextEntryNo) {
+                nextEntryNo = seeded[i].getEntryNo() + 1;
             }
         }
     }
@@ -70,8 +70,8 @@ public class AllocationControl {
      * Puts a booking into the queue at the current simulated minute.
      * Returns the entry, or null if the booking cannot join.
      */
-    public Allocation enqueue(Booking booking, SpecialCategory special) {
-        if (booking == null || special == null || booking.isAllocated()) {
+    public Allocation enqueue(Booking booking, SpecialCategory category) {
+        if (booking == null || category == null || booking.isAllocated()) {
             return null;
         }
         // goes through the collection: the same booking must not queue twice
@@ -79,11 +79,11 @@ public class AllocationControl {
             return null;
         }
 
-        Allocation entry = new Allocation(booking, special, clockMinute, nextSeq);
+        Allocation entry = new Allocation(booking, category, clockMinute, nextEntryNo);
         if (!admit(entry)) {
             return null;
         }
-        nextSeq++;
+        nextEntryNo++;
         return entry;
     }
 
@@ -108,7 +108,7 @@ public class AllocationControl {
     }
 
     /** Level order, which for this heap is array order — NOT priority order. */
-    public Allocation[] snapshot() {
+    public Allocation[] getLevelOrder() {
         Allocation[] entries = new Allocation[queue.size()];
         Iterator<Allocation> walker = queue.getIterator();
         int i = 0;
@@ -127,8 +127,8 @@ public class AllocationControl {
      * replace it with your own, or move it into MaxHeap as a toSortedArray()
      * add-on and call that instead.
      */
-    public Allocation[] serveOrder() {
-        Allocation[] entries = snapshot();
+    public Allocation[] getServeOrder() {
+        Allocation[] entries = getLevelOrder();
         for (int i = 0; i < entries.length - 1; i++) {
             int best = i;
             for (int j = i + 1; j < entries.length; j++) {
@@ -136,16 +136,16 @@ public class AllocationControl {
                     best = j;
                 }
             }
-            Allocation swap = entries[i];
+            Allocation temp = entries[i];
             entries[i] = entries[best];
-            entries[best] = swap;
+            entries[best] = temp;
         }
         return entries;
     }
 
     /** Confirmed bookings that have no room yet and are not already waiting. */
     public Booking[] getQueueableBookings() {
-        Booking[] all = bookings.getAllBookings();
+        Booking[] all = bookingControl.getAllBookings();
 
         int count = 0;
         for (int i = 0; i < all.length; i++) {
@@ -155,11 +155,11 @@ public class AllocationControl {
         }
 
         Booking[] queueable = new Booking[count];
-        int next = 0;
+        int filled = 0;
         for (int i = 0; i < all.length; i++) {
             if (isQueueable(all[i])) {
-                queueable[next] = all[i];
-                next++;
+                queueable[filled] = all[i];
+                filled++;
             }
         }
         return queueable;
@@ -210,7 +210,7 @@ public class AllocationControl {
     // --- priority ---
 
     private boolean admit(Allocation entry) {
-        entry.setInvariantPriority(computeKey(entry));
+        entry.setInvariantPriority(computeInvariantPriority(entry));
         return queue.add(entry);
     }
 
@@ -219,7 +219,7 @@ public class AllocationControl {
      * minute zero. The live score adds the same clock reading to everybody, so
      * dropping it changes no ordering and the stored key never goes stale.
      */
-    private long computeKey(Allocation entry) {
+    private long computeInvariantPriority(Allocation entry) {
         return entry.getTier().getWeight() - entry.getArrivalMinute();
     }
 }

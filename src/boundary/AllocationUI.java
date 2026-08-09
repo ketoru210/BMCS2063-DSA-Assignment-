@@ -27,13 +27,9 @@ import utility.OutputHelper;
 public class AllocationUI {
 
     private boolean firstTime = true;
-
     private static final String TITLE = "VIP & Loyalty Tier-Priority Room Allocation";
-
-    /** Cell width per node; 8 slots x 8 columns keeps four layers inside 64 columns. */
     private static final int CELL = 8;
-
-    private static final String DEAD_SCORE = "n/a";
+    private static final String DEAD_SCORE = "N/A";
 
     private final AllocationControl control;
 
@@ -139,12 +135,12 @@ public class AllocationUI {
             return;
         }
 
-        Allocation[] level = control.snapshot();
-        Allocation[] order = control.serveOrder();
+        Allocation[] levelOrder = control.getLevelOrder();
+        Allocation[] serveOrder = control.getServeOrder();
 
-        printTree(level, order);
+        printTree(levelOrder, serveOrder);
         System.out.println();
-        printTable(order);
+        printTable(serveOrder);
     }
 
     /**
@@ -153,21 +149,24 @@ public class AllocationUI {
      * branch rows need both layers' centres at once, so every label is measured
      * up front. The root is highlighted because it is always served next.
      */
-    private void printTree(Allocation[] level, Allocation[] order) {
-        int layers = layersFor(level.length);
+    private void printTree(Allocation[] levelOrder, Allocation[] serveOrder) {
+        int layers = layersFor(levelOrder.length);
 
         String[][] labels = new String[layers][];
         int[][] centres = new int[layers][];
 
+        // calculate the needed value first (where is the node, how many node, how long the width)
         for (int depth = 0; depth < layers; depth++) {
-            int first = (1 << depth) - 1;
-            int count = Math.min(1 << depth, level.length - first);
-            int block = CELL * (1 << (layers - 1 - depth));
+            // (1 << n) means (1 * 2 ^ n)
+            // - use this instead if Math.pow() is because i want result value in integer type
+            int first = (1 << depth) - 1;  // index in array of first node of the current layer
+            int count = Math.min(1 << depth, levelOrder.length - first);  // number of node of the current layer
+            int block = CELL * (1 << (layers - 1 - depth));  // width of node
 
             labels[depth] = new String[count];
             centres[depth] = new int[count];
             for (int k = 0; k < count; k++) {
-                String label = labelOf(level[first + k], order);
+                String label = labelOf(levelOrder[first + k], serveOrder);
                 int column = k * block + (block - label.length()) / 2;
                 labels[depth][k] = label;
                 centres[depth][k] = column + (label.length() - 1) / 2;
@@ -225,20 +224,20 @@ public class AllocationUI {
         return line.toString();
     }
 
-    private void printTable(Allocation[] order) {
+    private void printTable(Allocation[] serveOrder) {
         OutputHelper.printBlue(String.format("%2s  %-6s %-17s %-9s %-13s %7s %6s %7s",
                 "#", "Entry", "Guest", "Tier", "Special", "Waited", "P(0)", "P(now)"));
 
-        for (int i = 0; i < order.length; i++) {
-            Allocation entry = order[i];
-            boolean scored = entry.getSpecial() == SpecialCategory.NONE;
+        for (int i = 0; i < serveOrder.length; i++) {
+            Allocation entry = serveOrder[i];
+            boolean scored = entry.getCategory() == SpecialCategory.NONE;
 
             String row = String.format("%2d  #%-5d %-17s %-9s %-13s %3d min %6s %7s",
                     i + 1,
-                    entry.getSeq(),
+                    entry.getEntryNo(),
                     entry.getBooking().getMember().getName(),
                     entry.getTier(),
-                    entry.getSpecial(),
+                    entry.getCategory(),
                     control.getClockMinute() - entry.getArrivalMinute(),
                     scored ? String.valueOf(entry.getInvariantPriority()) : DEAD_SCORE,
                     scored ? String.valueOf(control.livePriority(entry)) : DEAD_SCORE);
@@ -253,21 +252,21 @@ public class AllocationUI {
     }
 
     /** Smallest L with 2^L - 1 >= n. Integer loop, so no floating-point rounding. */
-    private int layersFor(int entries) {
+    private int layersFor(int numOfEntries) {
         int layers = 0;
-        while (((1 << layers) - 1) < entries) {
+        while (((1 << layers) - 1) < numOfEntries) {
             layers++;
         }
         return layers;
     }
 
-    private String labelOf(Allocation entry, Allocation[] order) {
-        return "#" + entry.getSeq() + "(" + rankOf(entry, order) + ")";
+    private String labelOf(Allocation entry, Allocation[] serveOrder) {
+        return "#" + entry.getEntryNo() + "(" + rankOf(entry, serveOrder) + ")";
     }
 
-    private int rankOf(Allocation entry, Allocation[] order) {
-        for (int i = 0; i < order.length; i++) {
-            if (order[i].getSeq() == entry.getSeq()) {
+    private int rankOf(Allocation entry, Allocation[] serveOrder) {
+        for (int i = 0; i < serveOrder.length; i++) {
+            if (serveOrder[i].getEntryNo() == entry.getEntryNo()) {
                 return i + 1;
             }
         }
@@ -295,7 +294,7 @@ public class AllocationUI {
             fail("Nobody is waiting.");
             return;
         }
-        notice = "Served #" + served.getSeq() + " - "
+        notice = "Served #" + served.getEntryNo() + " - "
                 + served.getBooking().getMember().getName()
                 + " (booking " + served.getBooking().getConfirmationNo() + "). "
                 + control.size() + " still waiting.";
@@ -341,7 +340,7 @@ public class AllocationUI {
             fail("That booking could not join the queue.");
             return;
         }
-        notice = "Queued as #" + added.getSeq() + " at minute " + added.getArrivalMinute() + ".";
+        notice = "Queued as #" + added.getEntryNo() + " at minute " + added.getArrivalMinute() + ".";
     }
 
     private void cancelRequest() {
@@ -363,7 +362,7 @@ public class AllocationUI {
             fail("Could not remove that request.");
             return;
         }
-        notice = "Removed #" + entry.getSeq() + " from the queue.";
+        notice = "Removed #" + entry.getEntryNo() + " from the queue.";
     }
 
     /** Breaks off the prompt line first, so the message never lands beside it. */

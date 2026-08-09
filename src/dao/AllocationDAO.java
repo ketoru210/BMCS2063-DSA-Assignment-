@@ -42,10 +42,10 @@ public class AllocationDAO {
     }
 
     private static Allocation request(Booking[] pool, String confirmationNo,
-                                      SpecialCategory special, int arrivalMinute, int seq) {
+                                      SpecialCategory category, int arrivalMinute, int entryNo) {
         for (int i = 0; i < pool.length; i++) {
             if (pool[i].getConfirmationNo().equals(confirmationNo)) {
-                return new Allocation(pool[i], special, arrivalMinute, seq);
+                return new Allocation(pool[i], category, arrivalMinute, entryNo);
             }
         }
         return null;

@@ -14,17 +14,17 @@ import java.io.Serializable;
  */
 public class Allocation implements Serializable, Comparable<Allocation> {
     private final Booking booking;
-    private final SpecialCategory special;
+    private final SpecialCategory category;
     private final int arrivalMinute;
-    private final int seq;
+    private final int entryNo;
 
     private long invariantPriority;
 
-    public Allocation(Booking booking, SpecialCategory special, int arrivalMinute, int seq) {
+    public Allocation(Booking booking, SpecialCategory category, int arrivalMinute, int entryNo) {
         this.booking = booking;
-        this.special = special;
+        this.category = category;
         this.arrivalMinute = arrivalMinute;
-        this.seq = seq;
+        this.entryNo = entryNo;
     }
 
     public Booking getBooking() {
@@ -39,16 +39,16 @@ public class Allocation implements Serializable, Comparable<Allocation> {
         return booking.getMember().getCurrentTier();
     }
 
-    public SpecialCategory getSpecial() {
-        return special;
+    public SpecialCategory getCategory() {
+        return category;
     }
 
     public int getArrivalMinute() {
         return arrivalMinute;
     }
 
-    public int getSeq() {
-        return seq;
+    public int getEntryNo() {
+        return entryNo;
     }
 
     public long getInvariantPriority() {
@@ -62,21 +62,21 @@ public class Allocation implements Serializable, Comparable<Allocation> {
 
     @Override
     public int compareTo(Allocation other) {
-        int bySpecial = Integer.compare(special.getWeight(), other.special.getWeight());
-        if (bySpecial != 0) {
-            return bySpecial;
+        int byCategory = Integer.compare(category.getWeight(), other.category.getWeight());
+        if (byCategory != 0) {
+            return byCategory;
         }
 
         // inside a special band an ambulance does not check loyalty cards
-        if (special == SpecialCategory.NONE) {
+        if (category == SpecialCategory.NONE) {
             int byPriority = Long.compare(invariantPriority, other.invariantPriority);
             if (byPriority != 0) {
                 return byPriority;
             }
         }
 
-        // the smaller seq arrived first, but a max-heap serves the greater element
-        return Integer.compare(other.seq, seq);
+        // the smaller entryNo arrived first, but a max-heap serves the greater element
+        return Integer.compare(other.entryNo, entryNo);
     }
 
     @Override
@@ -87,16 +87,16 @@ public class Allocation implements Serializable, Comparable<Allocation> {
         if (obj == null || getClass() != obj.getClass()) {
             return false;
         }
-        return seq == ((Allocation) obj).seq;
+        return entryNo == ((Allocation) obj).entryNo;
     }
 
     @Override
     public String toString() {
         return String.format("#%-3d | %-18s | %-8s | %-12s | arrived %3d min | S=%d",
-                seq,
+                entryNo,
                 booking.getMember().getName(),
                 getTier(),
-                special,
+                category,
                 arrivalMinute,
                 invariantPriority);
     }

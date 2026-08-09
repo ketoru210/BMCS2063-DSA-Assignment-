@@ -10,7 +10,7 @@
 
 | *No.* | *Modules* | *Implementation (of team ADT)* | *Assigned to* | *Reason* |
 |------|---|---|---|---|
-| M2 | VIP & Loyalty Tier-Priority Room Allocation | `MaxHeap` | YZ | not covered in the course (originality marks); insert reorganizes automatically so the highest priority is always at the root — exactly the spec wording; priority = static key `tier*W - arrivalSeq*r`, so waiting-time aging needs no re-heapify |
+| M2 | VIP & Loyalty Tier-Priority Room Allocation | `MaxHeap` | YZ | not covered in the course (originality marks); insert reorganizes automatically so the highest priority is always at the root — exactly the spec wording; priority = static key `tier 权重 - arrivalMinute`, so waiting-time aging needs no re-heapify |
 | M3 | Housekeeping and Task Log | 2 * LinkedStack | Pujin | LIFO matches undo semantics; O(1) push/pop = spec's "roll back instantly"; second stack enables redo (cleared on new action) |
 | M4 | Front-Desk Service | Binary Search Tree (BST) / harder: AVL Tree | QW | tutor advised against hash; O(log n) search on the unique comparable confirmationNo; in-order traversal gives a sorted listing for free |
 | M5 | Loyalty and Rewards Service | Doubly Linked List | KY | no single dominant operation -> general-purpose collection; O(1) insert/remove after locating + two-way traversal, supports the many member features |
@@ -265,9 +265,9 @@ M5 给客人升级，M2 队列里读到的还是旧 tier，重排功能直接失
 ### Allocation（M2 内部，列在这里供集成参考）
 
 - who handle: module 2 (allocation) (yz)
-- fields: `booking, special, arrivalMinute, seq, invariantPriority`
+- fields: `booking, category, arrivalMinute, entryNo, invariantPriority`
 - `SpecialCategory`：`NONE 0, GOODWILL 10, HABITABILITY 20, COMPLIANCE 30, LIFE_SAFETY 40`
-- 排序三层：`special 权重` → `invariantPriority`（仅两边都是 NONE 时） → `seq` **反向**（先到先得）
+- 排序三层：`category 权重` → `invariantPriority`（仅两边都是 NONE 时） → `entryNo` **反向**（先到先得）
 - `invariantPriority = tier 权重 − arrivalMinute`，control 在 `add()` 前算好，此后不重算
 - 时钟是**可手动推进的模拟时钟**，不是墙上时间——真实时钟下 demo 全程只有几分钟，交叉点演示不出来
 

@@ -194,11 +194,11 @@ public class MaxHeap<T extends Comparable<T>> implements CollectionInterface<T> 
         if (index >= size) {
             return -1;
         }
-        int order = heap[index].compareTo(probe);
-        if (order < 0) {
+        int cmp = heap[index].compareTo(probe);
+        if (cmp < 0) {
             return -1;
         }
-        if (order == 0) {
+        if (cmp == 0) {
             return index;
         }
         int found = indexOf(probe, 2 * index + 1);
