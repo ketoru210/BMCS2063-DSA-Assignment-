@@ -1,5 +1,6 @@
 import boundary.AllocationUI;
 import boundary.HousekeepingUI;
+import boundary.FrontDeskUI;
 import control.AllocationControl;
 import control.BookingControl;
 import utility.InputHelper;
@@ -18,7 +19,7 @@ public class Main {
     private static final AllocationUI ALLOCATION_UI =
             new AllocationUI(new AllocationControl(BOOKINGS));
     private static final HousekeepingUI HOUSEKEEPING_UI = new HousekeepingUI();
-
+    private static final FrontDeskUI FRONT_DESK_UI = new FrontDeskUI(BOOKINGS);
     private enum MenuOption implements MenuItem {
         EXIT("Exit",
                 () -> {}
@@ -30,7 +31,7 @@ public class Main {
                 () -> HOUSEKEEPING_UI.run()
         ),
         FRONT_DESK("Front-Desk Service",
-                () -> System.out.println("//TODO: Redirect to Module 4")
+                () -> FRONT_DESK_UI.run()
         ),
         LOYALTY("Loyalty and Rewards Service",
                 () -> System.out.println("//TODO: Redirect to Module 5")
