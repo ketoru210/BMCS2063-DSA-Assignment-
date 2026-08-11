@@ -3,6 +3,7 @@ import boundary.HousekeepingUI;
 import boundary.FrontDeskUI;
 import control.AllocationControl;
 import control.BookingControl;
+import control.HousekeepingControl;
 import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
@@ -18,7 +19,8 @@ public class Main {
 
     private static final AllocationUI ALLOCATION_UI =
             new AllocationUI(new AllocationControl(BOOKINGS));
-    private static final HousekeepingUI HOUSEKEEPING_UI = new HousekeepingUI();
+    private static final HousekeepingControl HOUSEKEEPING_CONTROL = new HousekeepingControl();
+    private static final HousekeepingUI HOUSEKEEPING_UI = new HousekeepingUI(HOUSEKEEPING_CONTROL);
     private static final FrontDeskUI FRONT_DESK_UI = new FrontDeskUI(BOOKINGS);
     private enum MenuOption implements MenuItem {
         EXIT("Exit",

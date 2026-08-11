@@ -3,6 +3,7 @@ package boundary;
 import control.HousekeepingControl;
 import entity.HousekeepingTask;
 import entity.Room;
+import entity.RoomType;
 import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
@@ -16,7 +17,15 @@ import java.util.Iterator;
 public class HousekeepingUI {
     
     private static final String TITLE = "Housekeeping and Task Log";
-    private final HousekeepingControl control = new HousekeepingControl();
+    private final HousekeepingControl control;
+
+    public HousekeepingUI() {
+        this(new HousekeepingControl());
+    }
+
+    public HousekeepingUI(HousekeepingControl control) {
+        this.control = control;
+    }
 
     private enum MenuOption implements MenuItem {
         BACK("Back to Main Menu"),
@@ -24,7 +33,9 @@ public class HousekeepingUI {
         UPDATE("Update Room Status (Pipeline State Machine)"),
         UNDO("Undo Last Status Update"),
         REDO("Redo Last Status Update"),
-        LOG("View Task History Log (LinkedStack Traversal)");
+        LOG("View Task History Log (LinkedStack Traversal)"),
+        REPORT1("Report 1: Room Readiness & Efficiency Summary"),
+        REPORT2("Report 2: Task Activity & Audit Trail Report");
 
         private final String label;
 
@@ -64,6 +75,12 @@ public class HousekeepingUI {
                     break;
                 case LOG:
                     viewTaskLogUI();
+                    break;
+                case REPORT1:
+                    report1UI();
+                    break;
+                case REPORT2:
+                    report2UI();
                     break;
             }
             // Pause before the menu clears the screen again
@@ -229,5 +246,128 @@ public class HousekeepingUI {
             index++;
         }
         System.out.println();
+    }
+
+    // ==========================================================
+    // MODULE 6: REPORT 1 - ROOM READINESS & EFFICIENCY SUMMARY
+    // ==========================================================
+    private void report1UI() {
+        OutputHelper.printBlue("\n=== Report 1: Room Readiness & Housekeeping Efficiency Summary ===");
+        
+        // 1. Interactive Status Filter Choice
+        System.out.println("\n[Select Housekeeping Status Criteria]");
+        System.out.println("[0] All Statuses");
+        System.out.println("[1] Dirty");
+        System.out.println("[2] Cleaning In Progress");
+        System.out.println("[3] Inspected");
+        System.out.println("[4] Ready for Check-In");
+        int statusChoice = InputHelper.readInt("Select Status Criteria > ");
+        
+        String statusFilter = "ALL";
+        if (statusChoice == 1) statusFilter = "Dirty";
+        else if (statusChoice == 2) statusFilter = "Cleaning In Progress";
+        else if (statusChoice == 3) statusFilter = "Inspected";
+        else if (statusChoice == 4) statusFilter = "Ready for Check-In";
+
+        // 2. Interactive Room Type Criteria Choice
+        System.out.println("\n[Select Room Type Criteria]");
+        System.out.println("[0] All Types");
+        System.out.println("[1] SINGLE");
+        System.out.println("[2] DELUXE");
+        System.out.println("[3] SUITE");
+        int typeChoice = InputHelper.readInt("Select Room Type Criteria > ");
+
+        RoomType typeFilter = null;
+        if (typeChoice == 1) typeFilter = RoomType.SINGLE;
+        else if (typeChoice == 2) typeFilter = RoomType.DELUXE;
+        else if (typeChoice == 3) typeFilter = RoomType.SUITE;
+
+        // 3. Interactive Hand-written Sorting Choice
+        System.out.println("\n[Select Hand-Written Sort Ordering]");
+        System.out.println("[1] Room No (Ascending)");
+        System.out.println("[2] Room No (Descending)");
+        System.out.println("[3] Status Progression Order");
+        int sortChoice = InputHelper.readInt("Select Sort Ordering > ");
+
+        // Call Control Layer hand-written filter and Insertion Sort
+        Room[] filtered = control.getFilteredSortedRooms(statusFilter, typeFilter, sortChoice);
+
+        // Render Report Table
+        String divider = "+---------+----------+------------------+------------------------+";
+        System.out.println("\n" + divider);
+        System.out.printf("| %-7s | %-8s | %-16s | %-22s |%n", "Room No", "Type", "Occupancy", "Housekeeping Status");
+        System.out.println(divider);
+
+        int readyCount = 0;
+        int pendingCount = 0;
+        for (int i = 0; i < filtered.length; i++) {
+            Room r = filtered[i];
+            System.out.printf("| %-7s | %-8s | %-16s | %-22s |%n", 
+                    r.getRoomNo(), r.getRoomType(), r.getOccupancyStatus(), r.getHousekeepingStatus());
+            
+            if ("Ready for Check-In".equalsIgnoreCase(r.getHousekeepingStatus())) {
+                readyCount++;
+            } else {
+                pendingCount++;
+            }
+        }
+        System.out.println(divider);
+
+        // Render Executive Metrics Summary
+        int totalFiltered = filtered.length;
+        double readyPct = (totalFiltered > 0) ? ((double) readyCount / totalFiltered) * 100.0 : 0.0;
+        double pendingPct = (totalFiltered > 0) ? ((double) pendingCount / totalFiltered) * 100.0 : 0.0;
+
+        System.out.println("\n--- Executive Summary Metrics ---");
+        System.out.println("Total Matching Rooms: " + totalFiltered);
+        System.out.printf("Operational Ready Rate: %d room(s) (%.1f%%)%n", readyCount, readyPct);
+        System.out.printf("Pending Cleaning/Inspection: %d room(s) (%.1f%%)%n", pendingCount, pendingPct);
+        System.out.println("=================================================================\n");
+    }
+
+    // ==========================================================
+    // MODULE 6: REPORT 2 - TASK ACTIVITY & AUDIT TRAIL REPORT
+    // ==========================================================
+    private void report2UI() {
+        OutputHelper.printBlue("\n=== Report 2: Housekeeping Task Activity & Audit Trail Report ===");
+
+        // 1. Interactive Zone Filter Choice
+        System.out.println("\n[Select Zone / Room Prefix Criteria]");
+        System.out.println("[0] All Zones");
+        System.out.println("[1] Zone A (A-xxx)");
+        System.out.println("[2] Zone B (B-xxx)");
+        int zoneChoice = InputHelper.readInt("Select Zone Criteria > ");
+        String zoneFilter = "ALL";
+        if (zoneChoice == 1) zoneFilter = "A";
+        else if (zoneChoice == 2) zoneFilter = "B";
+
+        // 2. Interactive Sort Ordering Choice
+        System.out.println("\n[Select Hand-Written Selection Sort Ordering]");
+        System.out.println("[1] Most Recent First (LIFO Stack Order)");
+        System.out.println("[2] Chronological (Oldest First)");
+        int sortChoice = InputHelper.readInt("Select Sort Ordering > ");
+
+        // Call Control Layer hand-written Selection Sort
+        HousekeepingTask[] tasks = control.getFilteredSortedTasks(zoneFilter, sortChoice);
+
+        System.out.println("\n------------------------------------------------------------------");
+        System.out.printf("%-6s | %-60s%n", "No.", "Action Event Details");
+        System.out.println("------------------------------------------------------------------");
+
+        if (tasks.length == 0) {
+            System.out.println("No matching housekeeping task log entries found.");
+        } else {
+            for (int i = 0; i < tasks.length; i++) {
+                System.out.printf("%-6d | %-60s%n", (i + 1), tasks[i]);
+            }
+        }
+        System.out.println("------------------------------------------------------------------");
+
+        // Management Analytics Metrics
+        System.out.println("\n--- Audit Analytics & Metrics ---");
+        System.out.println("Total Filtered Task Events: " + tasks.length);
+        System.out.println("Active Undo Stack Depth: " + control.getUndoCount());
+        System.out.println("Active Redo Stack Depth: " + control.getRedoCount());
+        System.out.println("==================================================================\n");
     }
 }

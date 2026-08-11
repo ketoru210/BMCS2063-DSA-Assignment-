@@ -22,23 +22,7 @@ public class LinkedStack<T extends Comparable<T>> implements CollectionInterface
     }
 
     // ==========================================================
-    // 1. ADD-ON ALIASES (Your control layer uses these!)
-    // ==========================================================
-    
-    public void push(T newEntry) {
-        add(newEntry);
-    }
-
-    public T pop() {
-        return remove();
-    }
-
-    public T peek() {
-        return getFirst();
-    }
-
-    // ==========================================================
-    // 2. COLLECTION INTERFACE IMPLEMENTATION
+    // COLLECTION INTERFACE IMPLEMENTATION
     // ==========================================================
 
     @Override
