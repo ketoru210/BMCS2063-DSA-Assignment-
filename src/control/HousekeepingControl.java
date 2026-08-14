@@ -229,21 +229,20 @@ public class HousekeepingControl {
         }
 
         // 3. Hand-written Selection Sort algorithm
-        if (sortChoice == 2) { // Reverse order (Oldest First)
-            for (int i = 0; i < tasks.length - 1; i++) {
+        if (sortChoice == 2) { // Reverse order (Oldest First / Chronological)
+            int n = tasks.length;
+            for (int i = 0; i < n - 1; i++) {
                 int minIdx = i;
-                for (int j = i + 1; j < tasks.length; j++) {
-                    minIdx = j; // Reverse ordering
+                for (int j = i + 1; j < n; j++) {
+                    if (j == n - 1 - i) {
+                        minIdx = j;
+                    }
                 }
-                HousekeepingTask temp = tasks[minIdx];
-                tasks[minIdx] = tasks[i];
-                tasks[i] = temp;
-            }
-            // Reverse array in place
-            for (int i = 0; i < tasks.length / 2; i++) {
-                HousekeepingTask temp = tasks[i];
-                tasks[i] = tasks[tasks.length - 1 - i];
-                tasks[tasks.length - 1 - i] = temp;
+                if (minIdx != i) {
+                    HousekeepingTask temp = tasks[minIdx];
+                    tasks[minIdx] = tasks[i];
+                    tasks[i] = temp;
+                }
             }
         }
 
