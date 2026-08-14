@@ -3,10 +3,12 @@ package entity;
 import java.io.Serializable;
 
 /**
+ * Entity representing a single housekeeping task operation in Module 3.
+ *
  * @author Pujin
  */
 public class HousekeepingTask implements Comparable<HousekeepingTask>, Serializable {
-    
+
     private Room room;
     private String previousStatus;
     private String newStatus;
@@ -17,7 +19,6 @@ public class HousekeepingTask implements Comparable<HousekeepingTask>, Serializa
         this.newStatus = newStatus;
     }
 
-    // --- 1. Getters (Fixes the variable warnings and Controller errors) ---
     public Room getRoom() {
         return room;
     }
@@ -30,19 +31,27 @@ public class HousekeepingTask implements Comparable<HousekeepingTask>, Serializa
         return newStatus;
     }
 
-    // --- 2. compareTo (Fixes the red error on Line 3) ---
     @Override
     public int compareTo(HousekeepingTask other) {
-        return this.room.getRoomNo().compareToIgnoreCase(other.getRoom().getRoomNo()); 
+        if (other == null || other.getRoom() == null || this.room == null) {
+            return 0;
+        }
+        return this.room.getRoomNo().compareToIgnoreCase(other.getRoom().getRoomNo());
     }
 
-    // --- 3. equals & toString (Required by Spec Checklist) ---
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null || getClass() != obj.getClass()) return false;
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
         HousekeepingTask that = (HousekeepingTask) obj;
-        return this.room.getRoomNo().equalsIgnoreCase(that.getRoom().getRoomNo()); 
+        if (this.room == null || that.room == null) {
+            return false;
+        }
+        return this.room.getRoomNo().equalsIgnoreCase(that.room.getRoomNo());
     }
 
     @Override

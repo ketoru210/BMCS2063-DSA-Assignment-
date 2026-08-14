@@ -5,16 +5,23 @@ import adt.LinkedStack;
 import dao.RoomDAO;
 import entity.HousekeepingTask;
 import entity.Room;
+import entity.RoomType;
+import java.util.Iterator;
 
 /**
+ * Control for Module 3 — Housekeeping and Task Log.
+ * <p>
+ * Manages room housekeeping state transitions and records operation history
+ * using an undo/redo stack pair backed by the team's {@code LinkedStack} ADT.
+ * Supports state machine validation and custom report filtering/sorting.
+ *
  * @author Pujin
  */
 public class HousekeepingControl {
-    
-    // Programming to Interface (CollectionInterface) as requested by Team Lead
-    private CollectionInterface<HousekeepingTask> undoStack;
-    private CollectionInterface<HousekeepingTask> redoStack;
-    private RoomDAO roomDAO;
+
+    private final CollectionInterface<HousekeepingTask> undoStack;
+    private final CollectionInterface<HousekeepingTask> redoStack;
+    private final RoomDAO roomDAO;
 
     public HousekeepingControl() {
         undoStack = new LinkedStack<>();
@@ -22,93 +29,106 @@ public class HousekeepingControl {
         roomDAO = new RoomDAO();
     }
 
+    // --- queries ---
+
     public Room[] getAllRooms() {
         return roomDAO.getAllRooms();
     }
 
     public Room findRoom(String roomNo) {
+        if (roomNo == null) {
+            return null;
+        }
         Room[] rooms = roomDAO.getAllRooms();
         for (int i = 0; i < rooms.length; i++) {
-            if (rooms[i].getRoomNo().equalsIgnoreCase(roomNo)) {
+            if (rooms[i] != null && rooms[i].getRoomNo().equalsIgnoreCase(roomNo)) {
                 return rooms[i];
             }
         }
         return null;
     }
 
+    // --- status updates ---
+
     public boolean updateRoomStatus(String roomNo, String newStatus) {
         Room room = findRoom(roomNo);
-        if (room == null) return false;
+        if (room == null || newStatus == null) {
+            return false;
+        }
 
         HousekeepingTask task = new HousekeepingTask(room, room.getHousekeepingStatus(), newStatus);
-        
         undoStack.add(task);
-        redoStack.clear(); // A new action clears the redo history
-        
+        redoStack.clear();
+
         room.setHousekeepingStatus(newStatus);
         return true;
     }
 
     /**
-     * Cross-module Integration (plan.md L284):
-     * Called by Module 4 (Front-Desk Control) when a guest checks out to set room to Dirty.
+     * Sets room housekeeping status to Dirty upon guest check-out.
      */
     public boolean markDirty(Room room) {
-        if (room == null) return false;
+        if (room == null) {
+            return false;
+        }
         return updateRoomStatus(room.getRoomNo(), "Dirty");
     }
 
+    // --- undo / redo ---
+
     public boolean undoLastTask() {
-        if (undoStack.isEmpty()) return false;
+        if (undoStack.isEmpty()) {
+            return false;
+        }
 
         HousekeepingTask lastTask = undoStack.remove();
         redoStack.add(lastTask);
-        
+
         lastTask.getRoom().setHousekeepingStatus(lastTask.getPreviousStatus());
         return true;
     }
 
     public boolean redoLastTask() {
-        if (redoStack.isEmpty()) return false;
+        if (redoStack.isEmpty()) {
+            return false;
+        }
 
         HousekeepingTask revertedTask = redoStack.remove();
         undoStack.add(revertedTask);
-        
+
         revertedTask.getRoom().setHousekeepingStatus(revertedTask.getNewStatus());
         return true;
     }
 
     /**
-     * Business Logic (ECB): Returns allowed status progression choices based on current status.
+     * Returns allowed status progression choices based on current status.
      */
     public String[] getValidNextStatuses(String currentStatus) {
         if (currentStatus == null) {
-            return new String[]{"Dirty", "Cleaning In Progress", "Inspected", "Ready for Check-In"};
+            return new String[] { "Dirty", "Cleaning In Progress", "Inspected", "Ready for Check-In" };
         }
         switch (currentStatus) {
             case "Dirty":
-                return new String[]{"Cleaning In Progress"};
+                return new String[] { "Cleaning In Progress" };
             case "Cleaning In Progress":
-                return new String[]{"Inspected"};
+                return new String[] { "Inspected" };
             case "Inspected":
-                return new String[]{"Ready for Check-In", "Dirty"};
+                return new String[] { "Ready for Check-In", "Dirty" };
             case "Ready for Check-In":
-                return new String[]{"Dirty"};
+                return new String[] { "Dirty" };
             default:
-                return new String[]{"Dirty", "Cleaning In Progress", "Inspected", "Ready for Check-In"};
+                return new String[] { "Dirty", "Cleaning In Progress", "Inspected", "Ready for Check-In" };
         }
     }
 
-    /**
-     * Returns an iterator over the undo stack history (invokes CollectionInterface.getIterator()).
-     */
-    public java.util.Iterator<HousekeepingTask> getTaskLogIterator() {
+    public Iterator<HousekeepingTask> getTaskLogIterator() {
         return undoStack.getIterator();
     }
 
-    /**
-     * Returns the most recent task on the undo stack without removing it (invokes CollectionInterface.getFirst()).
-     */
+    public Iterator<HousekeepingTask> getRedoLogIterator() {
+        return redoStack.getIterator();
+    }
+
     public HousekeepingTask getTopTask() {
         return undoStack.getFirst();
     }
@@ -121,53 +141,37 @@ public class HousekeepingControl {
         return redoStack.size();
     }
 
-    // ==========================================================
-    // MODULE 6: REPORT GENERATION (Hand-written Search & Sort)
-    // ==========================================================
-
+    // --- report generation ---
+    // Report 1: Room Readiness & Efficiency Summary
     /**
-     * Report 1: Filters rooms by status and room type, then sorts them using
-     * a hand-written Insertion Sort algorithm (No java.util.Collections).
-     *
-     * @param statusFilter  "ALL" or specific housekeeping status
-     * @param typeFilter    null for all types, or specific RoomType
-     * @param sortChoice    1 = Room No Asc, 2 = Room No Desc, 3 = Status Order
+     * Filters rooms by status and type, then sorts using hand-written Insertion
+     * Sort.
      */
-    public Room[] getFilteredSortedRooms(String statusFilter, entity.RoomType typeFilter, int sortChoice) {
+    public Room[] getFilteredSortedRooms(String statusFilter, RoomType typeFilter, int sortChoice) {
         Room[] allRooms = getAllRooms();
-        
-        // 1. Count matching rooms
+
         int matchCount = 0;
         for (int i = 0; i < allRooms.length; i++) {
-            Room r = allRooms[i];
-            if (r == null) continue;
-            boolean matchStatus = (statusFilter == null || statusFilter.equalsIgnoreCase("ALL") || r.getHousekeepingStatus().equalsIgnoreCase(statusFilter));
-            boolean matchType = (typeFilter == null || r.getRoomType() == typeFilter);
-            if (matchStatus && matchType) {
+            if (matchesRoomFilter(allRooms[i], statusFilter, typeFilter)) {
                 matchCount++;
             }
         }
 
-        // 2. Populate filtered array
         Room[] filtered = new Room[matchCount];
         int index = 0;
         for (int i = 0; i < allRooms.length; i++) {
-            Room r = allRooms[i];
-            if (r == null) continue;
-            boolean matchStatus = (statusFilter == null || statusFilter.equalsIgnoreCase("ALL") || r.getHousekeepingStatus().equalsIgnoreCase(statusFilter));
-            boolean matchType = (typeFilter == null || r.getRoomType() == typeFilter);
-            if (matchStatus && matchType) {
-                filtered[index++] = r;
+            if (matchesRoomFilter(allRooms[i], statusFilter, typeFilter)) {
+                filtered[index++] = allRooms[i];
             }
         }
 
-        // 3. Hand-written Insertion Sort algorithm
+        // Insertion sort
         for (int i = 1; i < filtered.length; i++) {
             Room key = filtered[i];
             int j = i - 1;
             while (j >= 0 && compareRooms(filtered[j], key, sortChoice) > 0) {
                 filtered[j + 1] = filtered[j];
-                j = j - 1;
+                j--;
             }
             filtered[j + 1] = key;
         }
@@ -175,52 +179,61 @@ public class HousekeepingControl {
         return filtered;
     }
 
+    private boolean matchesRoomFilter(Room room, String statusFilter, RoomType typeFilter) {
+        if (room == null) {
+            return false;
+        }
+        boolean matchStatus = (statusFilter == null || statusFilter.equalsIgnoreCase("ALL")
+                || room.getHousekeepingStatus().equalsIgnoreCase(statusFilter));
+        boolean matchType = (typeFilter == null || room.getRoomType() == typeFilter);
+        return matchStatus && matchType;
+    }
+
     private int compareRooms(Room r1, Room r2, int sortChoice) {
         if (sortChoice == 2) {
-            // Room No Descending
             return r2.getRoomNo().compareToIgnoreCase(r1.getRoomNo());
         } else if (sortChoice == 3) {
-            // Status Progression Rank
             return getStatusRank(r1.getHousekeepingStatus()) - getStatusRank(r2.getHousekeepingStatus());
         } else {
-            // Default: Room No Ascending
             return r1.getRoomNo().compareToIgnoreCase(r2.getRoomNo());
         }
     }
 
     private int getStatusRank(String status) {
-        if (status == null) return 0;
+        if (status == null) {
+            return 0;
+        }
         switch (status) {
-            case "Dirty": return 1;
-            case "Cleaning In Progress": return 2;
-            case "Inspected": return 3;
-            case "Ready for Check-In": return 4;
-            default: return 5;
+            case "Dirty":
+                return 1;
+            case "Cleaning In Progress":
+                return 2;
+            case "Inspected":
+                return 3;
+            case "Ready for Check-In":
+                return 4;
+            default:
+                return 5;
         }
     }
 
+    // Report 2: Task Activity & Audit Trail Report
     /**
-     * Report 2: Traverses LinkedStack task log, filters by Zone prefix,
-     * and sorts using a hand-written Selection Sort algorithm.
-     *
-     * @param zoneFilter "ALL", "A", or "B"
-     * @param sortChoice 1 = Most Recent First, 2 = Oldest First
+     * Traverses LinkedStack task log, filters by Zone, and sorts using hand-written
+     * Selection Sort.
      */
     public HousekeepingTask[] getFilteredSortedTasks(String zoneFilter, int sortChoice) {
-        // 1. Count tasks matching zone filter using LinkedStack iterator
         int matchCount = 0;
-        java.util.Iterator<HousekeepingTask> countIt = undoStack.getIterator();
+        Iterator<HousekeepingTask> countIt = undoStack.getIterator();
         while (countIt.hasNext()) {
-            HousekeepingTask task = countIt.next();
-            if (matchesZone(task, zoneFilter)) {
+            if (matchesZone(countIt.next(), zoneFilter)) {
                 matchCount++;
             }
         }
 
-        // 2. Populate task array
         HousekeepingTask[] tasks = new HousekeepingTask[matchCount];
         int index = 0;
-        java.util.Iterator<HousekeepingTask> populateIt = undoStack.getIterator();
+        Iterator<HousekeepingTask> populateIt = undoStack.getIterator();
         while (populateIt.hasNext()) {
             HousekeepingTask task = populateIt.next();
             if (matchesZone(task, zoneFilter)) {
@@ -228,8 +241,8 @@ public class HousekeepingControl {
             }
         }
 
-        // 3. Hand-written Selection Sort algorithm
-        if (sortChoice == 2) { // Reverse order (Oldest First / Chronological)
+        // Selection sort
+        if (sortChoice == 2) {
             int n = tasks.length;
             for (int i = 0; i < n - 1; i++) {
                 int minIdx = i;
@@ -250,8 +263,12 @@ public class HousekeepingControl {
     }
 
     private boolean matchesZone(HousekeepingTask task, String zoneFilter) {
-        if (task == null || task.getRoom() == null) return false;
-        if (zoneFilter == null || zoneFilter.equalsIgnoreCase("ALL")) return true;
+        if (task == null || task.getRoom() == null) {
+            return false;
+        }
+        if (zoneFilter == null || zoneFilter.equalsIgnoreCase("ALL")) {
+            return true;
+        }
         return task.getRoom().getRoomNo().toUpperCase().startsWith(zoneFilter.toUpperCase());
     }
 }

@@ -15,7 +15,7 @@ public class OutputHelper {
     }
 
     public static void printErr(String msg) {
-        System.err.println(redANSI + msg + resetANSI);
+        System.out.println(redANSI + msg + resetANSI);
     }
 
     public static void printBlue(String msg) {
