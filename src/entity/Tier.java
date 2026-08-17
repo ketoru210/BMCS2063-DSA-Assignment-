@@ -7,29 +7,29 @@ import java.io.Serializable;
  */
 
 public class Tier implements Serializable, Comparable<Tier> {
+    private String season;
     private LoyaltyTier loyaltyTier;
-    private int season;
     private int seasonalPoints;
-    public Tier(LoyaltyTier loyaltyTier, int season, int seasonalPoints) {
-        this.loyaltyTier = loyaltyTier;
+    public Tier(String season, LoyaltyTier loyaltyTier, int seasonalPoints) {
         this.season = season;
+        this.loyaltyTier = loyaltyTier;
         this.seasonalPoints = seasonalPoints;
     }
     //Accessors(Getters)
+    public String getSeason() { return season; }
     public LoyaltyTier getLoyaltyTier() { return loyaltyTier; }
-    public int getSeason() { return season; }
     public int getSeasonalPoints() { return seasonalPoints; }
     //Compare to method
     @Override
     public int compareTo(Tier tier) {
-        return Integer.compare(season, tier.season);
+        return season.compareTo(tier.season);
     }
     //Equals method
     @Override
     public boolean equals(Object object) {
         if (this == object) return true;
         if (object == null || getClass() != object.getClass()) return false;
-        return season == ((Tier) object).season;
+        return season.equals(((Tier) object).season);
     }
     //To string method
     @Override
