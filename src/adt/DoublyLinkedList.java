@@ -115,7 +115,10 @@ public class DoublyLinkedList<T extends Comparable<T>> implements CollectionInte
     }
     @Override
     public Iterator<T> getIterator() {
-        return new ListIterator();
+        return new Cursor();
+    }
+    public Cursor getCursor() {
+        return new Cursor();
     }
     private class Node {
         private T data;
@@ -127,7 +130,7 @@ public class DoublyLinkedList<T extends Comparable<T>> implements CollectionInte
             this.next = null;
         }
     }
-    private class ListIterator implements Iterator<T> {
+    public class Cursor implements Iterator<T> {
         Node currentNode = firstNode;
         @Override
         public boolean hasNext() {
@@ -141,6 +144,19 @@ public class DoublyLinkedList<T extends Comparable<T>> implements CollectionInte
             T data = currentNode.data;
             currentNode = currentNode.next;
             return data;
+        }
+        public boolean hasPrevious() {
+            if (currentNode == null) {
+                return lastNode != null;
+            }
+            return currentNode.previous != null;
+        }
+        public T previous() {
+            if (!hasPrevious()) {
+                throw new NoSuchElementException();
+            }
+            currentNode = (currentNode == null) ? lastNode : currentNode.previous;
+            return currentNode.data;
         }
     }
 }
