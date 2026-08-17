@@ -1,9 +1,11 @@
 import boundary.AllocationUI;
 import boundary.HousekeepingUI;
 import boundary.FrontDeskUI;
+import boundary.LoyaltyUI;
 import control.AllocationControl;
 import control.BookingControl;
 import control.HousekeepingControl;
+import control.LoyaltyControl;
 import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
@@ -20,8 +22,10 @@ public class Main {
     private static final AllocationUI ALLOCATION_UI =
             new AllocationUI(new AllocationControl(BOOKINGS));
     private static final HousekeepingControl HOUSEKEEPING_CONTROL = new HousekeepingControl();
+    private static final LoyaltyControl LOYALTY_CONTROL = new LoyaltyControl();
     private static final HousekeepingUI HOUSEKEEPING_UI = new HousekeepingUI(HOUSEKEEPING_CONTROL);
     private static final FrontDeskUI FRONT_DESK_UI = new FrontDeskUI(BOOKINGS);
+    private static final LoyaltyUI LOYALTY_UI = new LoyaltyUI(LOYALTY_CONTROL);
     private enum MenuOption implements MenuItem {
         EXIT("Exit",
                 () -> {}
@@ -36,7 +40,7 @@ public class Main {
                 () -> FRONT_DESK_UI.run()
         ),
         LOYALTY("Loyalty and Rewards Service",
-                () -> System.out.println("//TODO: Redirect to Module 5")
+                () -> LOYALTY_UI.run()
         );
 
         private final String label;
