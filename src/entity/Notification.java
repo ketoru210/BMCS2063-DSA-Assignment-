@@ -2,22 +2,20 @@ package entity;
 
 import java.io.Serializable;
 
-/* 我不晓得我要不要用这个东西，也不知道应不应该手搓。
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-*/
-
 /**
  * @author Kang Yong
  */
 
 public class Notification implements Serializable, Comparable<Notification> {
+    private String notificationID;
     private String label;
     private String message;
     private String publishedDatetime;
     private NotificationType notificationType;
     private boolean isRead;
+    private static int notificationCount = 0;
     public Notification(String label, String message, String publishedDatetime, NotificationType notificationType) {
+        this.notificationID = String.format("N%05d", ++notificationCount);
         this.label = label;
         this.message = message;
         this.publishedDatetime = publishedDatetime;
@@ -25,16 +23,18 @@ public class Notification implements Serializable, Comparable<Notification> {
         this.isRead = false;
     }
     //Accessors(Getters)
+    public String getNotificationID() { return notificationID; }
     public String getLabel() { return label; }
     public String getMessage() { return message; }
     public String getPublishedDatetime() { return publishedDatetime; }
-    public NotificationType getType() {return notificationType;}
+    public NotificationType getType() { return notificationType; }
+    public static int getNotificationCount() { return notificationCount; }
     public boolean getIsRead() { return isRead; }
     public void read() { isRead = true; }
     //Compare to method
     @Override
     public int compareTo(Notification notification) {
-        return publishedDatetime.compareTo(notification.publishedDatetime);
+        return notificationID.compareTo(notification.notificationID);
     }
     //Equals method
     @Override
