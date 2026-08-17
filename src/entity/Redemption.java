@@ -7,25 +7,30 @@ import java.io.Serializable;
  */
 
 public class Redemption implements Serializable, Comparable<Redemption> {
+    private String redemptionID;
     private String label;
     private String reward;
     private int pointsSpent;
     private String redemptionDate;
+    private static int redemptionCount = 0;
     public Redemption(String label, String reward, int pointsSpent, String redemptionDate) {
+        this.redemptionID = String.format("RD%05d", ++redemptionCount);
         this.label = label;
         this.reward = reward;
         this.pointsSpent = pointsSpent;
         this.redemptionDate = redemptionDate;
     }
     //Accessors(Getters)
+    public String getRedemptionID() { return redemptionID; }
     public String getLabel() { return label; }
     public String getReward() { return reward; }
     public int getPointsSpent() { return pointsSpent; }
     public String getRedemptionDate() { return redemptionDate; }
+    public int getRedemptionCount() { return redemptionCount; }
     //Compare to method
     @Override
     public int compareTo(Redemption redemption) {
-        return redemptionDate.compareTo(redemption.redemptionDate);
+        return redemptionID.compareTo(redemption.redemptionID);
     }
     //Equals method
     @Override
