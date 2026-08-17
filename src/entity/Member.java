@@ -9,44 +9,75 @@ import adt.DoublyLinkedList;
  */
 
 public class Member implements Serializable, Comparable<Member> {
+    private String memberID;
     private String username;
     private String password;
-    private String memberID;
     private String name;
     private LoyaltyTier currentTier;
     private int currentPoints;
+    private int seasonalPoints;
+    private String pointsExpiryDate;
+    private boolean expiryWarningPosted;
     private static int memberCount = 0;
-    CollectionInterface<Tier> tierRecords = new DoublyLinkedList<>();
-    CollectionInterface<Redemption> redemptionRecords = new DoublyLinkedList<>();
-    CollectionInterface<Promotion> promotionRecords = new DoublyLinkedList<>();
-    CollectionInterface<Notification> notificationRecords = new DoublyLinkedList<>();
+    CollectionInterface<Notification> notificationRecords;
+    CollectionInterface<Promotion> promotionRecords;
+    CollectionInterface<Redemption> redemptionRecords;
+    CollectionInterface<Tier> tierRecords;
     public Member(String username, String password, String name) {
         this(username, password, name, LoyaltyTier.SILVER);
     }
     // seeded members and walk-in guests do not all start at SILVER
     public Member(String username, String password, String name, LoyaltyTier currentTier) {
+        this.memberID = String.format("M%05d", ++memberCount);
         this.username = username;
         this.password = password;
-        this.memberID = String.format("M%05d", ++memberCount);
         this.name = name;
         this.currentTier = currentTier;
-        currentPoints = 0;
+        this.currentPoints = 0;
+        this.seasonalPoints = 0;
+        this.pointsExpiryDate = null;
+        this.expiryWarningPosted = false;
+        this.notificationRecords = new DoublyLinkedList<>();
+        this.promotionRecords = new DoublyLinkedList<>();
+        this.redemptionRecords = new DoublyLinkedList<>();
+        this.tierRecords = new DoublyLinkedList<>();
     }
     //Accessors(Getters)
+    public String getMemberID() { return memberID; }
     public String getUsername() { return username; }
     public String getPassword() { return password; }
-    public String getMemberID() { return memberID; }
     public String getName() { return name; }
     public LoyaltyTier getCurrentTier() { return currentTier; }
     public int getCurrentPoints() { return currentPoints; }
     public static int getMemberCount() { return memberCount; }
-    public CollectionInterface<Tier> getTierRecords() { return tierRecords; }
-    public CollectionInterface<Redemption> getRedemptionRecords() { return redemptionRecords; }
-    public CollectionInterface<Promotion> getPromotionRecords() { return promotionRecords; }
+    public int getSeasonalPoints() { return seasonalPoints; }
+    public String getPointsExpiryDate() { return pointsExpiryDate; }
+    public boolean isExpiryWarningPosted() { return expiryWarningPosted; }
     public CollectionInterface<Notification> getNotificationRecords() { return notificationRecords; }
+    public CollectionInterface<Promotion> getPromotionRecords() { return promotionRecords; }
+    public CollectionInterface<Redemption> getRedemptionRecords() { return redemptionRecords; }
+    public CollectionInterface<Tier> getTierRecords() { return tierRecords; }
     //Mutators(Setters)
+    public void setPassword(String password) { this.password = password; }
+    public void setName(String name) { this.name = name; }
     public void setCurrentTier(LoyaltyTier currentTier) { this.currentTier = currentTier; }
     public void setCurrentPoints(int currentPoints) { this.currentPoints = currentPoints; }
+    public void setSeasonalPoints(int seasonalPoints) { this.seasonalPoints = seasonalPoints; }
+    public void addSeasonalPoints(int delta) { this.seasonalPoints += delta; }
+    public void setPointsExpiryDate(String pointsExpiryDate) { this.pointsExpiryDate = pointsExpiryDate; }
+    public void setExpiryWarningPosted(boolean expiryWarningPosted) { this.expiryWarningPosted = expiryWarningPosted; }
+    public DoublyLinkedList<Notification>.Cursor getNotificationCursor() {
+        return ((DoublyLinkedList<Notification>) notificationRecords).getCursor();
+    }
+    public DoublyLinkedList<Promotion>.Cursor getPromotionCursor() {
+        return ((DoublyLinkedList<Promotion>) promotionRecords).getCursor();
+    }
+    public DoublyLinkedList<Redemption>.Cursor getRedemptionCursor() {
+        return ((DoublyLinkedList<Redemption>) redemptionRecords).getCursor();
+    }
+    public DoublyLinkedList<Tier>.Cursor getTierCursor() {
+        return ((DoublyLinkedList<Tier>) tierRecords).getCursor();
+    }
     //Compare to method
     @Override
     public int compareTo(Member member) {
