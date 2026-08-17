@@ -4,5 +4,16 @@ package entity;
  * @author Kang Yong
  */
 public enum NotificationType {
-    TIER_CHANGE, REDEMPTION, PROMOTION, ANNOUNCEMENT
+    ANNOUNCEMENT("Announcement"),
+    PROMOTION("Promotion"),
+    REDEMPTION("Redemption"),
+    TIER_CHANGE("Tier change");
+    private final String label;
+    NotificationType(String label) {
+        this.label = label;
+    }
+    @Override
+    public String toString() {
+        return label;
+    }
 }
