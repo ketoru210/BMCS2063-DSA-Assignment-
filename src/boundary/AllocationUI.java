@@ -1,8 +1,14 @@
 package boundary;
 
 import control.AllocationControl;
+import control.AllocationControl.Field;
+import control.AllocationControl.Forecast;
+import control.AllocationControl.Operator;
 import entity.Allocation;
 import entity.Booking;
+import entity.LoyaltyTier;
+import entity.Room;
+import entity.RoomType;
 import entity.SpecialCategory;
 import utility.InputHelper;
 import utility.MenuItem;
@@ -28,7 +34,7 @@ public class AllocationUI {
 
     private boolean firstTime = true;
     private static final String TITLE = "VIP & Loyalty Tier-Priority Room Allocation";
-    private static final int CELL = 8;
+    private static final int MIN_CELL = 8;
     private static final String DEAD_SCORE = "N/A";
 
     private final AllocationControl control;
@@ -47,7 +53,9 @@ public class AllocationUI {
         FAST_FORWARD("Fast-Forward Clock"),
         SERVE("Serve Next Request"),
         ADD("Add Request to Queue"),
-        CANCEL("Cancel a Request");
+        CANCEL("Cancel a Request"),
+        STARVATION("Report: Starvation Guarantee"),
+        FORECAST("Report: Fulfilment Dry-Run");
 
         private final String label;
 
@@ -84,6 +92,12 @@ public class AllocationUI {
                     break;
                 case CANCEL:
                     cancelRequest();
+                    break;
+                case STARVATION:
+                    starvationReport();
+                    break;
+                case FORECAST:
+                    forecastReport();
                     break;
             }
         }
@@ -127,7 +141,8 @@ public class AllocationUI {
             notice = null;
         }
 
-        OutputHelper.printBlue("now = " + control.getClockMinute() + " min (simulated)");
+        OutputHelper.printBlue("now = " + control.getClockMinute() + " min (simulated)"
+                + "    rooms ready: " + control.getReadyRoomCount());
         System.out.println();
 
         if (control.isEmpty()) {
@@ -152,6 +167,15 @@ public class AllocationUI {
     private void printTree(Allocation[] levelOrder, Allocation[] serveOrder) {
         int layers = layersFor(levelOrder.length);
 
+        // labelled up front because the cell has to fit the widest of them, and
+        // every row's geometry is derived from the cell
+        String[] flat = new String[levelOrder.length];
+        int cell = MIN_CELL;
+        for (int i = 0; i < levelOrder.length; i++) {
+            flat[i] = labelOf(levelOrder[i], serveOrder);
+            cell = Math.max(cell, flat[i].length() + 2);
+        }
+
         String[][] labels = new String[layers][];
         int[][] centres = new int[layers][];
 
@@ -161,12 +185,12 @@ public class AllocationUI {
             // - use this instead if Math.pow() is because i want result value in integer type
             int first = (1 << depth) - 1;  // index in array of first node of the current layer
             int count = Math.min(1 << depth, levelOrder.length - first);  // number of node of the current layer
-            int block = CELL * (1 << (layers - 1 - depth));  // width of node
+            int block = cell * (1 << (layers - 1 - depth));  // width of node
 
             labels[depth] = new String[count];
             centres[depth] = new int[count];
             for (int k = 0; k < count; k++) {
-                String label = labelOf(levelOrder[first + k], serveOrder);
+                String label = flat[first + k];
                 int column = k * block + (block - label.length()) / 2;
                 labels[depth][k] = label;
                 centres[depth][k] = column + (label.length() - 1) / 2;
@@ -186,6 +210,7 @@ public class AllocationUI {
         }
         System.out.println();
         OutputHelper.printBlue("  #n = entry no. (permanent)    (n) = serve order");
+        OutputHelper.printOK("  next serve: #" + serveOrder[0].getEntryNo());
     }
 
     private String rowOf(String[] labels, int[] centres) {
@@ -202,8 +227,8 @@ public class AllocationUI {
 
     /**
      * Brackets each sibling pair. A single slash cannot span the gap — the
-     * horizontal distance to a child is a quarter of the parent's block, eight
-     * columns at the root — so the dashes carry the distance and the slashes
+     * horizontal distance to a child is a quarter of the parent's block, far
+     * more than one column — so the dashes carry the distance and the slashes
      * only mark which end is whose.
      */
     private String branchRow(int[] childCentres) {
@@ -290,14 +315,36 @@ public class AllocationUI {
 
     private void serveNext() {
         Allocation served = control.serveNext();
+        String swept = sweptNote(control.getLastDiscarded());
+
         if (served == null) {
-            fail("Nobody is waiting.");
+            // whatever was dropped, the head that is left still says why we stopped
+            Allocation waiting = control.peekNext();
+            fail((waiting == null
+                    ? "Nobody is waiting."
+                    : "No ready room fits #" + waiting.getEntryNo() + "'s "
+                            + waiting.getBooking().getRoomType()
+                            + " booking - a guest is never downgraded.") + swept);
             return;
         }
-        notice = "Served #" + served.getEntryNo() + " - "
-                + served.getBooking().getMember().getName()
-                + " (booking " + served.getBooking().getConfirmationNo() + "). "
-                + control.size() + " still waiting.";
+
+        Booking booking = served.getBooking();
+        Room room = booking.getRoom();
+        String upgrade = room.getRoomType() == booking.getRoomType()
+                ? ""
+                : " (upgraded from " + booking.getRoomType() + ")";
+
+        notice = "Served #" + served.getEntryNo() + " - " + booking.getMember().getName()
+                + " -> room " + room.getRoomNo() + ", " + room.getRoomType() + upgrade
+                + ". " + control.size() + " still waiting." + swept;
+    }
+
+    private String sweptNote(int discarded) {
+        if (discarded == 0) {
+            return "";
+        }
+        return " Dropped " + discarded + (discarded == 1 ? " entry" : " entries")
+                + " whose booking had already moved on.";
     }
 
     private void addRequest() {
@@ -363,6 +410,233 @@ public class AllocationUI {
             return;
         }
         notice = "Removed #" + entry.getEntryNo() + " from the queue.";
+    }
+
+    // --- reports ---
+
+    /**
+     * Asks what to measure and how to arrange it, then hands both answers to the
+     * control. Nothing about the question is fixed here: the field, the direction
+     * and the comparison all arrive as values.
+     */
+    private void starvationReport() {
+        if (control.isEmpty()) {
+            fail("Nobody is waiting.");
+            return;
+        }
+
+        LoyaltyTier challenger = askChallenger();
+        if (challenger == null) {
+            fail("Not a listed tier.");
+            return;
+        }
+        Field field = askField();
+        if (field == null) {
+            fail("Not a listed value.");
+            return;
+        }
+
+        int order = InputHelper.readInt("\nOrder:  [1] Highest first  [2] Lowest first  (0 = highest) > ");
+        if (order < 0 || order > 2) {
+            fail("Please enter 0, 1 or 2.");
+            return;
+        }
+        boolean descending = order != 2;
+
+        Operator[] ops = Operator.values();
+        System.out.println("\nKeep only the entries whose " + field + " is:");
+        for (int i = 0; i < ops.length; i++) {
+            System.out.printf("[%d] %s%n", i + 1, ops[i]);
+        }
+        int comparison = InputHelper.readInt("\nSelect (0 = keep everybody) > ");
+        if (comparison < 0 || comparison > ops.length) {
+            fail("Please enter a number between 0 and " + ops.length + ".");
+            return;
+        }
+
+        long threshold = 0;
+        if (comparison > 0) {
+            threshold = InputHelper.readInt("Value > ");
+        }
+
+        Allocation[] rows = control.getServeOrder();
+        if (comparison > 0) {
+            rows = control.filterBy(rows, field, ops[comparison - 1], threshold, challenger);
+        }
+        rows = control.sortBy(rows, field, descending, challenger);
+
+        printStarvation(rows, field, ops, comparison, threshold, descending, challenger);
+        InputHelper.waitForEnter();
+    }
+
+    private void printStarvation(Allocation[] rows, Field field, Operator[] ops, int comparison,
+                                 long threshold, boolean descending, LoyaltyTier challenger) {
+        System.out.println();
+        OutputHelper.printTitle("Starvation Guarantee Analysis");
+        OutputHelper.printBlue("now = " + control.getClockMinute() + " min (simulated)"
+                + "    challenger = " + challenger + " (" + challenger.getWeight() + " min)");
+        OutputHelper.printBlue("showing " + rows.length + " of " + control.size()
+                + "    filter: " + (comparison == 0
+                        ? "none"
+                        : field + " " + ops[comparison - 1] + " " + threshold)
+                + "    sorted by " + field + (descending ? " (highest first)" : " (lowest first)"));
+        System.out.println();
+
+        if (rows.length == 0) {
+            OutputHelper.printBlue("  No entry matches that filter.");
+        } else {
+            System.out.printf("%-6s %-17s %-9s %-13s %8s %8s %11s%n",
+                    "Entry", "Guest", "Tier", "Special", "Waited", "Immune@", "Remaining");
+            for (int i = 0; i < rows.length; i++) {
+                Allocation entry = rows[i];
+                boolean protectedByCategory = control.isCategoryProtected(entry);
+                int exposure = control.getExposure(entry, challenger);
+
+                String line = String.format("#%-5d %-17s %-9s %-13s %4d min %8s %11s",
+                        entry.getEntryNo(),
+                        entry.getBooking().getMember().getName(),
+                        entry.getTier(),
+                        entry.getCategory(),
+                        control.getWaited(entry),
+                        protectedByCategory ? DEAD_SCORE
+                                : String.valueOf(control.getImmuneAt(entry, challenger)),
+                        protectedByCategory ? "immune *"
+                                : (exposure == 0 ? "immune" : exposure + " min"));
+
+                if (exposure == 0) {
+                    OutputHelper.printOK(line);
+                } else {
+                    System.out.println(line);
+                }
+            }
+            OutputHelper.printBlue("  * outranked on category, which no ordinary arrival can reach");
+        }
+
+        // the verdict describes the whole queue, not the filtered slice above
+        Allocation worst = control.getMostExposed(challenger);
+        int safe = control.countProtected(challenger);
+
+        System.out.println();
+        OutputHelper.printBlue("--- whole queue ---");
+        System.out.printf("  Protected now    : %d of %d  (%.1f%%)%n",
+                safe, control.size(), safe * 100.0 / control.size());
+        System.out.printf("  Longest exposure : %s%n",
+                control.getExposure(worst, challenger) == 0
+                        ? "none - every place is already safe"
+                        : "#" + worst.getEntryNo() + " " + worst.getBooking().getMember().getName()
+                                + ", " + control.getExposure(worst, challenger) + " min");
+        System.out.printf("  Queue sealed at  : minute %d%n", control.getSealedAtMinute(challenger));
+
+        double[] mean = control.getMeanExposureByTier(challenger);
+        int[] count = control.getCountByTier();
+        StringBuilder byTier = new StringBuilder("  Mean exposure    : ");
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+        for (int i = tiers.length - 1; i >= 0; i--) {
+            byTier.append(String.format("%s(%d) %.1f", tiers[i], count[i], mean[i]));
+            if (i > 0) {
+                byTier.append("   ");
+            }
+        }
+        System.out.println(byTier);
+    }
+
+    /** Allocates the queue on paper. Nothing here or in the control writes back. */
+    private void forecastReport() {
+        if (control.isEmpty()) {
+            fail("Nobody is waiting.");
+            return;
+        }
+
+        int lookAhead = InputHelper.readInt(
+                "\nLook ahead how many serves (0 = until the queue stalls) > ");
+        if (lookAhead < 0) {
+            fail("Look-ahead cannot be negative.");
+            return;
+        }
+
+        printForecast(control.forecast(lookAhead), lookAhead);
+        InputHelper.waitForEnter();
+    }
+
+    private void printForecast(Forecast forecast, int lookAhead) {
+        System.out.println();
+        OutputHelper.printTitle("Fulfilment Dry-Run");
+        OutputHelper.printBlue("looking ahead: "
+                + (lookAhead == 0 ? "whole queue (" + forecast.getQueued() + ")" : lookAhead + " serves")
+                + "    rooms ready: " + control.getReadyRoomCount());
+        System.out.println();
+
+        Allocation blocker = forecast.getBlocker();
+        if (blocker == null) {
+            OutputHelper.printOK(String.format("  Served    : %d of %d - the look-ahead clears with no stall",
+                    forecast.getServed(), forecast.getQueued()));
+        } else {
+            OutputHelper.printOK(String.format("  Served    : %d of %d before the queue stalls",
+                    forecast.getServed(), forecast.getQueued()));
+            OutputHelper.printErr(String.format("  Stalls at : #%d %s - wants %s, and no upgrade is free either",
+                    blocker.getEntryNo(),
+                    blocker.getBooking().getMember().getName(),
+                    blocker.getBooking().getRoomType()));
+            System.out.printf("  Blocked   : %d %s behind it%n",
+                    forecast.getBlocked(),
+                    forecast.getBlocked() == 1 ? "entry sits" : "entries sit");
+        }
+
+        System.out.println();
+        System.out.printf("  %-9s %8s %7s %6s%n", "Type", "Waiting", "Ready", "Gap");
+        RoomType[] types = RoomType.values();
+        int[] waiting = forecast.getWaitingByType();
+        int[] ready = forecast.getReadyByType();
+        for (int i = 0; i < types.length; i++) {
+            int gap = ready[i] - waiting[i];
+            String line = String.format("  %-9s %8d %7d %6d", types[i], waiting[i], ready[i], gap);
+            if (gap < 0) {
+                OutputHelper.printErr(line);
+            } else {
+                System.out.println(line);
+            }
+        }
+
+        System.out.println();
+        System.out.printf("  Upgrades  : %d, giving away RM %,.2f%n",
+                forecast.getUpgrades(), forecast.getUpgradeCost());
+
+        if (blocker != null) {
+            Room releasable = forecast.getReleasable();
+            OutputHelper.printBlue(String.format("  Unblock   : one more ready %s serves %d more; %s",
+                    blocker.getBooking().getRoomType(),
+                    forecast.getUnblockGain(),
+                    releasable == null
+                            ? "none is vacant, so this waits on a checkout"
+                            : "room " + releasable.getRoomNo() + " is vacant and only needs cleaning ("
+                                    + releasable.getHousekeepingStatus() + ")"));
+        }
+    }
+
+    private LoyaltyTier askChallenger() {
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+        System.out.println("\nTest the queue against the arrival of which tier?");
+        for (int i = 0; i < tiers.length; i++) {
+            System.out.printf("[%d] %s (%d min of tier weight)%n", i + 1, tiers[i], tiers[i].getWeight());
+        }
+        int pick = InputHelper.readInt("\nSelect (0 = Platinum, the worst case) > ");
+        if (pick == 0) {
+            return LoyaltyTier.PLATINUM;
+        }
+        return (pick < 1 || pick > tiers.length) ? null : tiers[pick - 1];
+    }
+
+    private Field askField() {
+        Field[] fields = Field.values();
+        System.out.println("\nMeasure which value?");
+        for (int i = 0; i < fields.length; i++) {
+            System.out.printf("[%d] %s%n", i + 1, fields[i]);
+        }
+        int pick = InputHelper.readInt("\nSelect (0 = Exposure remaining) > ");
+        if (pick == 0) {
+            return Field.EXPOSURE;
+        }
+        return (pick < 1 || pick > fields.length) ? null : fields[pick - 1];
     }
 
     /** Breaks off the prompt line first, so the message never lands beside it. */
