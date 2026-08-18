@@ -241,21 +241,18 @@ public class HousekeepingControl {
             }
         }
 
-        // Selection sort
+        // Selection sort (Chronological / room ordering)
         if (sortChoice == 2) {
-            int n = tasks.length;
-            for (int i = 0; i < n - 1; i++) {
+            for (int i = 0; i < tasks.length - 1; i++) {
                 int minIdx = i;
-                for (int j = i + 1; j < n; j++) {
-                    if (j == n - 1 - i) {
+                for (int j = i + 1; j < tasks.length; j++) {
+                    if (tasks[j].compareTo(tasks[minIdx]) < 0) {
                         minIdx = j;
                     }
                 }
-                if (minIdx != i) {
-                    HousekeepingTask temp = tasks[minIdx];
-                    tasks[minIdx] = tasks[i];
-                    tasks[i] = temp;
-                }
+                HousekeepingTask temp = tasks[i];
+                tasks[i] = tasks[minIdx];
+                tasks[minIdx] = temp;
             }
         }
 

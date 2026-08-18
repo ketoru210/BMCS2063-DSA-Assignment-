@@ -19,13 +19,21 @@ public class Room implements Serializable, Comparable<Room> {
     }
 
     // --- Getters ---
-    public String getRoomNo() { return roomNo; }
-    
-    // NEW: Added missing getters for the UI table
-    public RoomType getRoomType() { return roomType; }
-    public String getOccupancyStatus() { return occupancyStatus; }
-    
-    public String getHousekeepingStatus() { return housekeepingStatus; }
+    public String getRoomNo() {
+        return roomNo;
+    }
+
+    public RoomType getRoomType() {
+        return roomType;
+    }
+
+    public String getOccupancyStatus() {
+        return occupancyStatus;
+    }
+
+    public String getHousekeepingStatus() {
+        return housekeepingStatus;
+    }
     
     // --- Setters ---
     // Available -> Reserved is M2's; Reserved -> Occupied / -> Available is M4's

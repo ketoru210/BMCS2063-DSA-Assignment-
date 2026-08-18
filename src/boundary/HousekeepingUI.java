@@ -350,12 +350,15 @@ public class HousekeepingUI {
         System.out.println("[0] All Zones");
         System.out.println("[1] Zone A (A-xxx)");
         System.out.println("[2] Zone B (B-xxx)");
+        System.out.println("[3] Zone C (C-xxx)");
         int zoneChoice = InputHelper.readInt("Select Zone Criteria > ");
         String zoneFilter = "ALL";
         if (zoneChoice == 1)
             zoneFilter = "A";
         else if (zoneChoice == 2)
             zoneFilter = "B";
+        else if (zoneChoice == 3)
+            zoneFilter = "C";
 
         System.out.println("\n[Select Sort Ordering]");
         System.out.println("[1] Most Recent First (LIFO Stack Order)");
