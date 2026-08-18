@@ -16,6 +16,8 @@ import java.time.temporal.ChronoUnit;
  * @author YZ (placeholder)
  */
 public class Booking implements Serializable, Comparable<Booking> {
+    private static final long serialVersionUID = 1L;
+
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final String confirmationNo;
@@ -97,6 +99,11 @@ public class Booking implements Serializable, Comparable<Booking> {
             return false;
         }
         return confirmationNo.equals(((Booking) obj).confirmationNo);
+    }
+
+    @Override
+    public int hashCode() {
+        return confirmationNo.hashCode();
     }
 
     @Override

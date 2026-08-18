@@ -13,6 +13,8 @@ import java.io.Serializable;
  * @author YZ
  */
 public class Allocation implements Serializable, Comparable<Allocation> {
+    private static final long serialVersionUID = 1L;
+
     private final Booking booking;
     private final SpecialCategory category;
     private final int arrivalMinute;
@@ -88,6 +90,11 @@ public class Allocation implements Serializable, Comparable<Allocation> {
             return false;
         }
         return entryNo == ((Allocation) obj).entryNo;
+    }
+
+    @Override
+    public int hashCode() {
+        return entryNo;
     }
 
     @Override
