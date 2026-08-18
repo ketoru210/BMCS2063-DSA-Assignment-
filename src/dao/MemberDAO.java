@@ -78,6 +78,13 @@ public class MemberDAO {
                     new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.PLATINUM, 15000) }
             ),
             new MemberSeed(
+                    new Member("wongsh", "pw1234", "Wong Siew Hoon", LoyaltyTier.PLATINUM),
+                    new Promotion[]{WELCOME_BACK, PLATINUM_DINING, COMPLIMENTARY_BREAKFAST, PLATINUM_ROOM_UPGRADE},
+                    new Notification[]{ new Notification("Platinum Tier Benefits", "Your Platinum membership benefits are now active.", "01-01-2026", NotificationType.TIER_CHANGE) },
+                    new Redemption[]{},
+                    new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.PLATINUM, 12000) }
+            ),
+            new MemberSeed(
                     new Member("nurula", "pw1234", "Nurul Aina", LoyaltyTier.GOLD),
                     new Promotion[]{WELCOME_BACK, GOLD_DINING, GOLD_SPA, COMPLIMENTARY_BREAKFAST, BIRTHDAY_CELEBRATION},
                     new Notification[]{
@@ -99,6 +106,13 @@ public class MemberDAO {
                     new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.GOLD, 6000) }
             ),
             new MemberSeed(
+                    new Member("rajesh", "pw1234", "Rajesh Naidu", LoyaltyTier.GOLD),
+                    new Promotion[]{WELCOME_BACK, GOLD_DINING, COMPLIMENTARY_BREAKFAST, BIRTHDAY_CELEBRATION},
+                    new Notification[]{ new Notification("Gold Tier Achieved", "Congratulations! You have reached Gold tier.", "08-01-2026", NotificationType.TIER_CHANGE) },
+                    new Redemption[]{},
+                    new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.GOLD, 5500) }
+            ),
+            new MemberSeed(
                     new Member("ravic", "pw1234", "Ravi Chandran", LoyaltyTier.SILVER),
                     new Promotion[]{WELCOME_BACK, SILVER_DINING, WEEKEND_ESCAPE, BIRTHDAY_CELEBRATION},
                     new Notification[]{
@@ -116,6 +130,13 @@ public class MemberDAO {
                     new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.SILVER, 1800) }
             ),
             new MemberSeed(
+                    new Member("gohyl", "pw1234", "Goh Yee Ling", LoyaltyTier.SILVER),
+                    new Promotion[]{WELCOME_BACK, SILVER_DINING, WEEKEND_ESCAPE},
+                    new Notification[]{ new Notification("Welcome to Silver", "Welcome to the Silver membership tier.", "01-02-2026", NotificationType.TIER_CHANGE) },
+                    new Redemption[]{},
+                    new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.SILVER, 2000) }
+            ),
+            new MemberSeed(
                     new Member("chongml", "pw1234", "Chong Mei Ling", LoyaltyTier.GUEST),
                     new Promotion[]{},
                     new Notification[]{ new Notification("Swimming Pool Closure", "The swimming pool will be temporarily closed for maintenance.", "10-03-2026", NotificationType.ANNOUNCEMENT) },
@@ -126,6 +147,20 @@ public class MemberDAO {
                     new Member("arunk", "pw1234", "Arun Kumar", LoyaltyTier.GUEST),
                     new Promotion[]{},
                     new Notification[]{ new Notification("Festive Season Event", "Join us for our special festive season event.", "15-02-2026", NotificationType.ANNOUNCEMENT) },
+                    new Redemption[]{},
+                    new Tier[]{}
+            ),
+            new MemberSeed(
+                    new Member("faridah", "pw1234", "Faridah Hassan", LoyaltyTier.GUEST),
+                    new Promotion[]{},
+                    new Notification[]{},
+                    new Redemption[]{},
+                    new Tier[]{}
+            ),
+            new MemberSeed(
+                    new Member("leejh", "pw1234", "Lee Jun Hao", LoyaltyTier.GUEST),
+                    new Promotion[]{},
+                    new Notification[]{},
                     new Redemption[]{},
                     new Tier[]{}
             )
@@ -143,7 +178,15 @@ public class MemberDAO {
     }
     public Promotion[] getAllPromotions() { return PROMOTIONS; }
     public Notification[] getGuestNotifications() {
-        return new Notification[]{ SEEDS[5].notifications[0], SEEDS[6].notifications[0] };
+        return new Notification[]{
+                seedFor("chongml").notifications[0],
+                seedFor("arunk").notifications[0]
+        };
+    }
+    // by username, not index: SEEDS order shifts whenever a member is seeded in
+    private static MemberSeed seedFor(String username) {
+        for (MemberSeed seed : SEEDS) if (seed.member.getUsername().equals(username)) return seed;
+        return null;
     }
     public Promotion[][] getAllPromotionRecords() {
         Promotion[][] result = new Promotion[SEEDS.length][];

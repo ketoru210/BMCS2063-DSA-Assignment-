@@ -31,13 +31,18 @@ public class AllocationDAO {
 
     /** Entries whose confirmation number is missing from the pool come back null. */
     public Allocation[] getAllRequests(Booking[] pool) {
+        // three Confirmed bookings are deliberately left out so that adding a
+        // request has candidates from the first screen, without serving first
         return new Allocation[]{
             request(pool, "10042087", SpecialCategory.NONE, 0, 1),
             request(pool, "47318206", SpecialCategory.NONE, 35, 2),
             request(pool, "22905613", SpecialCategory.NONE, 20, 3),
             request(pool, "68140379", SpecialCategory.NONE, 78, 4),
             request(pool, "35672941", SpecialCategory.HABITABILITY, 55, 5),
-            request(pool, "81203756", SpecialCategory.NONE, 88, 6)
+            request(pool, "81203756", SpecialCategory.NONE, 88, 6),
+            request(pool, "26718493", SpecialCategory.NONE, 8, 7),
+            request(pool, "50937164", SpecialCategory.LIFE_SAFETY, 62, 8),
+            request(pool, "18265037", SpecialCategory.NONE, 44, 9)
         };
     }
 
