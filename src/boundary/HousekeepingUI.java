@@ -19,11 +19,9 @@ public class HousekeepingUI {
 
     private static final String TITLE = "Housekeeping and Task Log";
     private final HousekeepingControl control;
-
-    public HousekeepingUI() {
-        this(new HousekeepingControl());
-    }
-
+    
+    /** Handed the control rather than building one: the undo/redo history has to
+     *  survive leaving this screen, and M2 allocates against the same rooms. */
     public HousekeepingUI(HousekeepingControl control) {
         this.control = control;
     }

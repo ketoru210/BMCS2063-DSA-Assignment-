@@ -17,30 +17,39 @@ public class Main {
     // Wired once, here. Each control loads its own module's DAO and is then the
     // single way in for everybody else, so no two modules hold their own copy of
     // the same data — and a screen's state survives being left and re-entered.
-    private static final BookingControl BOOKINGS = new BookingControl();
-
-    private static final AllocationUI ALLOCATION_UI =
-            new AllocationUI(new AllocationControl(BOOKINGS));
     private static final HousekeepingControl HOUSEKEEPING_CONTROL = new HousekeepingControl();
     private static final LoyaltyControl LOYALTY_CONTROL = new LoyaltyControl();
+    private static final BookingControl BOOKINGS = new BookingControl(HOUSEKEEPING_CONTROL);
+    private static final AllocationControl ALLOCATION_CONTROL =
+            new AllocationControl(BOOKINGS, HOUSEKEEPING_CONTROL);
+
+    static {
+        // M2 reads bookings from M4, and cancelling a booking has to pull its
+        // request back out of M2's queue. One of the two directions cannot be a
+        // constructor argument, and this is it.
+        BOOKINGS.attachAllocation(ALLOCATION_CONTROL);
+    }
+
     private static final HousekeepingUI HOUSEKEEPING_UI = new HousekeepingUI(HOUSEKEEPING_CONTROL);
+    private static final AllocationUI ALLOCATION_UI = new AllocationUI(ALLOCATION_CONTROL);
     private static final FrontDeskUI FRONT_DESK_UI = new FrontDeskUI(BOOKINGS);
     private static final LoyaltyUI LOYALTY_UI = new LoyaltyUI(LOYALTY_CONTROL);
+
     private enum MenuOption implements MenuItem {
         EXIT("Exit",
                 () -> {}
         ),
         VIP_PRIORITY("VIP & Loyalty Tier-Priority Room Allocation",
-                () -> ALLOCATION_UI.run()
+                ALLOCATION_UI::run
         ),
         HOUSEKEEPING("Housekeeping and Task Log",
-                () -> HOUSEKEEPING_UI.run()
+                HOUSEKEEPING_UI::run
         ),
         FRONT_DESK("Front-Desk Service",
-                () -> FRONT_DESK_UI.run()
+                FRONT_DESK_UI::run
         ),
         LOYALTY("Loyalty and Rewards Service",
-                () -> LOYALTY_UI.run()
+                LOYALTY_UI::run
         );
 
         private final String label;
