@@ -35,7 +35,9 @@ public class FrontDeskUI {
         NEW_BOOKING("New Walk-in Booking"),
         LOOK_UP("Look Up Booking"),
         CHECK_IN("Check-in Guest"),
+        CHECK_OUT("Check-out Guest"),
         CANCEL("Cancel Booking"),
+        PURGE("Purge Cancelled Bookings"),
         HEALTH("Tree Health Report"),
         RANGE("Confirmation Range Audit");
 
@@ -72,8 +74,14 @@ public class FrontDeskUI {
                 case CHECK_IN:
                     checkIn();
                     break;
+                case CHECK_OUT:
+                    checkOut();
+                    break;
                 case CANCEL:
                     cancel();
+                    break;
+                case PURGE:
+                    purge();
                     break;
                 case HEALTH:
                     treeHealthReport();
@@ -209,10 +217,31 @@ public class FrontDeskUI {
             notice = "Checked in " + confirmationNo + ".";
             return;
         }
+
         Booking found = control.findByConfirmationNo(confirmationNo);
-        OutputHelper.printErr(found == null
-                ? "\nNo booking with confirmation no. " + confirmationNo
-                : "\nCannot check in: status is already " + found.getStatus() + ".");
+        OutputHelper.printErr("\n" + (found == null
+                ? "No booking with confirmation no. " + confirmationNo
+                : found.isAllocated()
+                        ? "Cannot check in: status is " + found.getStatus() + "."
+                        : "Cannot check in: status is " + found.getStatus()
+                                + " and no room has been allocated."));
+        InputHelper.waitForEnter();
+    }
+
+    private void checkOut() {
+        String confirmationNo = InputHelper.readLine("\nConfirmation no. > ");
+        Booking found = control.findByConfirmationNo(confirmationNo);
+        // read while the booking still holds it — checking out lets the room go
+        String roomNo = found != null && found.isAllocated() ? found.getRoom().getRoomNo() : "-";
+
+        if (control.checkOut(confirmationNo)) {
+            notice = "Checked out " + confirmationNo + ". Room " + roomNo
+                    + " is back in the pool and now Dirty for housekeeping.";
+            return;
+        }
+        OutputHelper.printErr("\n" + (found == null
+                ? "No booking with confirmation no. " + confirmationNo
+                : "Cannot check out: status is " + found.getStatus() + ", not Checked-in."));
         InputHelper.waitForEnter();
     }
 
@@ -224,6 +253,11 @@ public class FrontDeskUI {
             InputHelper.waitForEnter();
             return;
         }
+        if (!control.isCancellable(found)) {
+            OutputHelper.printErr("\nAlready " + found.getStatus() + " - nothing to cancel.");
+            InputHelper.waitForEnter();
+            return;
+        }
 
         System.out.println("\n  " + found);
         String answer = InputHelper.readLine("Cancel this booking? [y/N] > ");
@@ -232,12 +266,24 @@ public class FrontDeskUI {
             return;
         }
 
+        Booking cancelled = control.cancel(confirmationNo);
+        notice = cancelled == null
+                ? "Nothing was cancelled."
+                : "Cancelled " + cancelled.getConfirmationNo() + ". It stays on file as "
+                        + cancelled.getStatus() + ", and any room or queue place it held is released.";
+    }
+
+    /** The only path that takes a node out of the tree, so the height can move. */
+    private void purge() {
         int heightBefore = control.getTreeHeight();
-        Booking removed = control.cancel(confirmationNo);
-        notice = removed == null
-                ? "Nothing was removed."
-                : "Cancelled " + removed.getConfirmationNo()
-                        + ". Tree height " + heightBefore + " -> " + control.getTreeHeight() + ".";
+        int sizeBefore = control.size();
+
+        int removed = control.purgeCancelled();
+        notice = removed == 0
+                ? "No cancelled booking is on file."
+                : "Purged " + removed + " cancelled booking" + (removed == 1 ? "" : "s")
+                        + ". On file " + sizeBefore + " -> " + control.size()
+                        + ", tree height " + heightBefore + " -> " + control.getTreeHeight() + ".";
     }
 
     private void treeHealthReport() {
@@ -293,23 +339,28 @@ public class FrontDeskUI {
             return;
         }
 
-        System.out.printf("  %-12s %-18s %-8s %-6s %s%n",
-                "CONF NO", "GUEST", "TYPE", "NIGHTS", "CHARGE");
+        System.out.printf("  %-12s %-18s %-8s %-6s %-12s %s%n",
+                "CONF NO", "GUEST", "TYPE", "NIGHTS", "STATUS", "CHARGE");
         for (int i = 0; i < batch.length; i++) {
-            System.out.printf("  %-12s %-18s %-8s %-6d %s%n",
+            // a cancelled row is still listed, but shows no money against it
+            boolean earns = control.earnsRevenue(batch[i]);
+            System.out.printf("  %-12s %-18s %-8s %-6d %-12s %s%n",
                     batch[i].getConfirmationNo(),
                     batch[i].getMember().getName(),
                     batch[i].getRoomType(),
                     batch[i].getNights(),
-                    money(control.revenueOf(batch[i])));
+                    batch[i].getStatus(),
+                    earns ? money(control.revenueOf(batch[i])) : "-");
         }
 
         double total = control.totalRevenueOf(batch);
+        int earning = control.countEarning(batch);
         System.out.println();
-        System.out.printf("  Matched      : %d of %d on file%n", batch.length, control.size());
+        System.out.printf("  Matched      : %d of %d on file  (%d earning, %d cancelled)%n",
+                batch.length, control.size(), earning, batch.length - earning);
         System.out.printf("  Total charge : %s%n", money(total));
         System.out.printf("  Average      : %s per booking, %.1f nights%n",
-                money(total / batch.length), control.averageNightOf(batch));
+                money(earning == 0 ? 0.0 : total / earning), control.averageNightOf(batch));
         System.out.println();
 
         RoomType[] types = RoomType.values();
