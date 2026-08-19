@@ -24,7 +24,7 @@ public class LoyaltyUI {
     public LoyaltyUI(LoyaltyControl control) { this.control = control; }
     private enum MenuOption implements MenuItem {
         BACK("Back to Main Menu"),
-        SELECT("Select one of them"),
+        SELECT("Select One of Them"),
         PREVIOUS("Previous"),
         NEXT("Next"),
         DELETE("Delete"),
@@ -55,7 +55,16 @@ public class LoyaltyUI {
         MANAGE_NOTIFICATIONS("Manage Notifications"),
         MANAGE_REDEMPTIONS("View Redemption Records"),
 
-        CREATE_PROMOTION("Create Promotion");
+        MODIFY_PROMOTION("Modify Existing Promotions"),
+        CREATE_PROMOTION("Create Promotion"),
+        VIEW_REWARD("View All Reward"),
+        EDIT_REWARD("Edit Reward"),
+        DISABLE_REWARD("Disable Reward"),
+        ADD_REWARD("Add Reward"),
+        EDIT_TIER_REQUIREMENTS("Edit a Tier Requirements"),
+        END_SEASON("End Current Season Now"),
+        VIEW_MEMBER_NOTIFICATION("View Member Notification"),
+        ANNOUNCE("Make Announcement");
         private final String label;
         MenuOption(String label) { this.label = label; }
         @Override
@@ -263,11 +272,7 @@ public class LoyaltyUI {
                 MenuOption.CHANGE_PASSWORD
         };
         for (;;) {
-            MenuOption selected = Menu.prompt(
-                    TITLE,
-                    "Manage Profile",
-                    profileOptions
-            );
+            MenuOption selected = Menu.prompt(TITLE, "Manage Profile", profileOptions);
             if (selected == MenuOption.BACK) return;
             switch (selected) {
                 case CHANGE_NAME:
@@ -327,7 +332,6 @@ public class LoyaltyUI {
     }
     private void statusUI() {
         control.refreshMemberState(currentMember);
-        if (requireMemberLogin()) return;
         for (;;) {
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Membership Status");
@@ -363,24 +367,21 @@ public class LoyaltyUI {
         }
     }
     private void displayAllTierRequirements() {
-        for (;;) {
-            OutputHelper.clearScreen();
-            OutputHelper.printTitle("All Tier Requirements");
-            LoyaltyTier[] tiers = LoyaltyTier.values();
-            for (LoyaltyTier tier : tiers) {
-                if (tier == LoyaltyTier.GUEST) continue;
-                TierRequirement requirement = control.findTierRequirement(tier);
-                if (requirement != null) {
-                    System.out.println("=== " + requirement.getLoyaltyTier() + " ===");
-                    System.out.println("Upgrade Requirement     : " + formatRequirement(requirement.getPointsToUpgradeTier()));
-                    System.out.println("Maintenance Requirement : " + formatRequirement(requirement.getPointsToDowngradeTier()));
-                    System.out.println("Benefits                : " + requirement.getBenefits());
-                    System.out.println();
-                }
+        OutputHelper.clearScreen();
+        OutputHelper.printTitle("All Tier Requirements");
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+        for (LoyaltyTier tier : tiers) {
+            if (tier == LoyaltyTier.GUEST) continue;
+            TierRequirement requirement = control.findTierRequirement(tier);
+            if (requirement != null) {
+                System.out.println("=== " + requirement.getLoyaltyTier() + " ===");
+                System.out.println("Upgrade Requirement     : " + formatRequirement(requirement.getPointsToUpgradeTier()));
+                System.out.println("Maintenance Requirement : " + formatRequirement(requirement.getPointsToDowngradeTier()));
+                System.out.println("Benefits                : " + requirement.getBenefits());
+                System.out.println();
             }
-            InputHelper.waitForEnter();
-            return;
         }
+        InputHelper.waitForEnter();
     }
     private void tierHistoryUI() {
         Tier[] records = control.getTierRecords(currentMember);
@@ -463,7 +464,6 @@ public class LoyaltyUI {
         return points + " points";
     }
     private void redeemUI() {
-        if (requireMemberLogin()) return;
         MenuOption[] options = {
                 MenuOption.BACK,
                 MenuOption.REWARDS,
@@ -527,7 +527,10 @@ public class LoyaltyUI {
                 continue;
             }
             String confirmation = InputHelper.readLine("Redeem " + reward.getRewardName() + " for " + reward.getRequiredPoints() + " points? (Y/N): ");
-            if (!confirmation.equalsIgnoreCase("Y")) continue;
+            if (!confirmation.equalsIgnoreCase("Y")) {
+                OutputHelper.printErr("Redemption unsuccessful.");
+                continue;
+            }
             if (control.redeemReward(currentMember, reward)) {
                 OutputHelper.printOK("Reward redeemed successfully.");
                 System.out.println("Remaining Points: " + currentMember.getCurrentPoints());
@@ -548,8 +551,8 @@ public class LoyaltyUI {
         for (;;) {
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Redemption History");
-            for (int i = 0; i < redemptions.length; i++) {
-                System.out.println("[" + redemptions[i].getRedemptionID() + "] " + redemptions[i].getLabel());
+            for (Redemption redemption : redemptions) {
+                System.out.println("[" + redemption.getRedemptionID() + "] " + redemption.getLabel());
             }
             System.out.println();
             MenuOption[] options = {
@@ -913,13 +916,13 @@ public class LoyaltyUI {
     private void editMember(Member member) {
         OutputHelper.clearScreen();
         OutputHelper.printTitle("Edit Member");
-        String name = InputHelper.readLine("New Name: ");
+        String name = InputHelper.readLine("New Name (or 0 to cancel): ");
         if (name.equals("0")) return;
-        String password = InputHelper.readLine("New Password: ");
+        String password = InputHelper.readLine("New Password (or 0 to cancel): ");
         if (password.equals("0")) return;
         LoyaltyTier tier = null;
         for (;;) {
-            String tierInput = InputHelper.readLine("New Tier (Silver/Gold/Platinum): ");
+            String tierInput = InputHelper.readLine("New Tier (Silver/Gold/Platinum, or 0 to cancel): ");
             if (tierInput.equals("0")) return;
             if (!tierInput.isBlank()) {
                 switch (tierInput.trim().toLowerCase()) {
@@ -940,7 +943,7 @@ public class LoyaltyUI {
             }
             break;
         }
-        int pointsInput = InputHelper.readInt("New Points: ");
+        int pointsInput = InputHelper.readInt("New Points (or 0 to cancel): ");
         if (pointsInput == 0) return;
         if (control.updateMember(member, name, password, tier, pointsInput)) {
             OutputHelper.printOK("Member updated successfully.");
@@ -949,24 +952,28 @@ public class LoyaltyUI {
         }
         InputHelper.waitForEnter();
     }
-    //From this point forward, most navigations are not changed to enum's menu option, yet.
     private void managePromotionUI() {
+        MenuOption[] options = {
+                MenuOption.BACK,
+                MenuOption.MODIFY_PROMOTION,
+                MenuOption.CREATE_PROMOTION
+        };
         for (;;) {
             OutputHelper.clearScreen();
-            OutputHelper.printTitle("Manage Promotions");
-            System.out.println("[0] Back");
-            System.out.println("[1] Modify Existing Promotion");
-            System.out.println("[2] Create New Promotion");
-            int choice = InputHelper.readInt("\nPlease Select > ");
-            if (choice == 0) {
-                return;
-            } else if (choice == 1) {
-                modifyPromotionUI();
-            } else if (choice == 2) {
-                createPromotionUI();
+            OutputHelper.printTitle("Manage Promotion");
+            MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
+            switch(selected) {
+                case BACK:
+                    return;
+                case MODIFY_PROMOTION:
+                    modifyPromotionUI();
+                    break;
+                case CREATE_PROMOTION:
+                    createPromotionUI();
+                    break;
+                default:
+                    break;
             }
-            else OutputHelper.printErr("Invalid option.");
-            InputHelper.waitForEnter();
         }
     }
     private void modifyPromotionUI() {
@@ -1016,277 +1023,6 @@ public class LoyaltyUI {
         }
         OutputHelper.printOK("Promotion created: " + promotion.getPromotionID());
     }
-    private boolean containsTier(LoyaltyTier[] tiers, LoyaltyTier tier) {
-        for (LoyaltyTier t : tiers) {
-            if (t == tier) return true;
-        }
-        return false;
-    }
-    private Promotion findPromotionForAdmin(Member member, int id) {
-        Promotion promotion = control.findPromotionByID(member, id);
-        if (promotion != null) return promotion;
-        for (Member other : control.getAllMembers()) {
-            promotion = control.findPromotionByID(other, id);
-            if (promotion != null) return promotion;
-        }
-        return null;
-    }
-    private void manageRewardUI() {
-        for (;;) {
-            OutputHelper.clearScreen();
-            OutputHelper.printTitle("Manage Rewards");
-            System.out.println("[0] Back");
-            System.out.println("[1] View / Edit / Delete Rewards");
-            System.out.println("[2] Add Reward");
-            int choice = InputHelper.readInt("\nPlease Select > ");
-            if (choice == 0) {
-                return;
-            }
-            if (choice == 1) {
-                viewEditRewardUI();
-            } else if (choice == 2) {
-                addRewardUI();
-            } else {
-                OutputHelper.printErr("Invalid option.");
-                InputHelper.waitForEnter();
-            }
-        }
-    }
-    private void viewEditRewardUI() {
-        for (Reward reward : control.getAvailableRewards()) {
-            System.out.println("[" + reward.getRewardID() + "] " + reward.getRewardName() + " | " + reward.getRequiredPoints() + " pts | " + (reward.isAvailable() ? "Available" : "Disabled"));
-        }
-        int id = InputHelper.readInt("Enter Reward ID to edit/delete (0 to cancel) > ");
-        if (id == 0) return;
-        Reward reward = control.findRewardByID(id);
-        if (reward == null) { OutputHelper.printErr("Reward not found."); return; }
-        System.out.println("[0] Cancel");
-        System.out.println("[1] Edit");
-        System.out.println("[2] Delete (disable)");
-        int action = InputHelper.readInt("Select > ");
-        if (action == 1) {
-            String name = InputHelper.readLine("New Name (blank to keep): ");
-            if (!name.isBlank()) reward.setRewardName(name);
-            String desc = InputHelper.readLine("New Description (blank to keep): ");
-            if (!desc.isBlank()) reward.setDescription(desc);
-            String pointsStr = InputHelper.readLine("New Required Points (blank to keep): ");
-            if (!pointsStr.isBlank()) reward.setRequiredPoints(Integer.parseInt(pointsStr));
-            OutputHelper.printOK("Reward updated.");
-        } else if (action == 2) {
-            if (control.disableReward(id)) {
-                OutputHelper.printOK("Reward disabled.");
-            } else {
-                OutputHelper.printErr("Unable to disable reward.");
-            }
-        }
-    }
-    private void addRewardUI() {
-        String name = InputHelper.readLine("Reward Name: ");
-        String description = InputHelper.readLine("Description: ");
-        int points = InputHelper.readInt("Required Points: ");
-        OutputHelper.printOK(control.createReward(name, description, points) != null ? "Reward added." : "Unable to add reward.");
-    }
-    private void manageTierUI() {
-        for (;;) {
-            OutputHelper.clearScreen();
-            OutputHelper.printTitle("Manage Tier Requirements");
-            System.out.println("Current Season: " + control.getSeasonSummary());
-            System.out.println("[0] Back");
-            System.out.println("[1] View Requirements");
-            System.out.println("[2] Edit a Tier's Requirements");
-            System.out.println("[3] End Current Season Now");
-            int choice = InputHelper.readInt("\nPlease Select > ");
-            switch (choice) {
-                case 0:
-                    return;
-                case 1:
-                    displayAllTierRequirements();
-                    break;
-                case 2:
-                    editTierRequirementUI();
-                    break;
-                case 3:
-                    control.endSeason();
-                    OutputHelper.printOK("Season ended. New season: " + control.getSeasonSummary());
-                    break;
-                default:
-                    OutputHelper.printErr("Invalid option.");
-            }
-            InputHelper.waitForEnter();
-        }
-    }
-    private void editTierRequirementUI() {
-        LoyaltyTier tier = selectTier();
-        if (tier == LoyaltyTier.GUEST) {
-            OutputHelper.printErr("Guest tier cannot be edited.");
-            return;
-        }
-        System.out.println("[0] Cancel");
-        System.out.println("[1] Upgrade Requirement");
-        System.out.println("[2] Maintenance Requirement");
-        System.out.println("[3] Benefits");
-        switch (InputHelper.readInt("Select field > ")) {
-            case 1:
-                control.updateTierUpgradeRequirement(tier, InputHelper.readInt("New Upgrade Requirement: "));
-                break;
-            case 2:
-                control.updateTierDowngradeRequirement(tier, InputHelper.readInt("New Maintenance Requirement: "));
-                break;
-            case 3:
-                control.updateTierBenefits(tier, InputHelper.readLine("New Benefits: "));
-                break;
-            default:
-                return;
-        }
-        OutputHelper.printOK("Tier requirement updated.");
-    }
-    private void manageNotificationUI() {
-        for (;;) {
-            OutputHelper.clearScreen();
-            OutputHelper.printTitle("Manage Notifications");
-            System.out.println("[0] Back");
-            System.out.println("[1] View Member Notifications");
-            System.out.println("[2] Send Announcement to a Member");
-            System.out.println("[3] Broadcast Announcement to All");
-            int choice = InputHelper.readInt("\nPlease Select > ");
-            switch (choice) {
-                case 0:
-                    return;
-                case 1:
-                    adminViewMemberNotifications();
-                    break;
-                case 2:
-                    makeAnnouncement();
-                    break;
-                case 3:
-                    broadcastAnnouncement();
-                    break;
-                default:
-                    OutputHelper.printErr("Invalid option.");
-            }
-            InputHelper.waitForEnter();
-        }
-    }
-    private void adminViewMemberNotifications() {
-        Member member = promptForMember();
-        if (member == null) return;
-        Notification[] notifications = control.getMemberNotifications(member);
-        if (notifications.length == 0) {
-            OutputHelper.printBlue("No notifications.");
-            return;
-        }
-        for (int i = 0; i < notifications.length; i++) {
-            System.out.println("[" + (i+1) + "] " + notifications[i].getLabel());
-        }
-        int choice = InputHelper.readInt("Select Notification (0 to cancel) > ");
-        if (choice < 1 || choice > notifications.length) return;
-        adminBrowseNotifications(control.getNotificationCursor(member, choice - 1));
-    }
-    private void adminBrowseNotifications(DoublyLinkedList<Notification>.Cursor cursor) {
-        Notification notification = cursor.next();
-        for (;;) {
-            OutputHelper.clearScreen();
-            OutputHelper.printTitle("Notification Details (Admin View)");
-            printNotification(notification);
-            MenuOption[] options = {
-                    MenuOption.BACK,
-                    MenuOption.PREVIOUS,
-                    MenuOption.NEXT
-            };
-            MenuOption selected = Menu.prompt(TITLE, "Notification Details", options);
-            if (selected == MenuOption.BACK) return;
-            if (selected == MenuOption.NEXT) {
-                if (cursor.hasNext()) {
-                    cursor.next();
-                } else {
-                    OutputHelper.printErr("This is the last notification.");
-                    InputHelper.waitForEnter();
-                }
-            } else if (selected == MenuOption.PREVIOUS) {
-                if (cursor.hasPrevious()) {
-                    cursor.previous();
-                } else {
-                    OutputHelper.printErr("This is the first notification.");
-                    InputHelper.waitForEnter();
-                }
-            }
-        }
-    }
-    private void makeAnnouncement() {
-        Member member = promptForMember();
-        if (member == null) return;
-        String label = InputHelper.readLine("Announcement Label: ");
-        String message = InputHelper.readLine("Announcement Message: ");
-        OutputHelper.printOK(control.postAnnouncement(member, label, message) ? "Announcement posted." : "Unable to post announcement.");
-    }
-    private void broadcastAnnouncement() {
-        String label = InputHelper.readLine("Announcement Label: ");
-        String message = InputHelper.readLine("Announcement Message: ");
-        control.broadcastAnnouncement(label, message);
-        OutputHelper.printOK("Announcement broadcast successfully.");
-    }
-    private void manageRedemptionUI() {
-        Member member = promptForMember();
-        if (member == null) return;
-        Redemption[] redemptions = control.getRedemptionRecords(member);
-        if (redemptions.length == 0) {
-            OutputHelper.printBlue("No redemption records.");
-            return;
-        }
-        for (int i = 0; i < redemptions.length; i++) {
-            System.out.println("[" + (i+1) + "] " + redemptions[i].getLabel());
-        }
-        int choice = InputHelper.readInt("Select Redemption (0 to cancel) > ");
-        if (choice < 1 || choice > redemptions.length) return;
-        adminBrowseRedemptions(control.getRedemptionCursor(member, choice - 1));
-    }
-    private void adminBrowseRedemptions(DoublyLinkedList<Redemption>.Cursor cursor) {
-        Redemption redemption = cursor.next(); // admin view: no delete
-        for (;;) {
-            OutputHelper.clearScreen();
-            OutputHelper.printTitle("Redemption Details (Admin View)");
-            printRedemption(redemption);
-            MenuOption[] options = {
-                    MenuOption.BACK,
-                    MenuOption.PREVIOUS,
-                    MenuOption.NEXT
-            };
-            MenuOption selected = Menu.prompt(TITLE, "Redemption Details", options);
-            if (selected == MenuOption.BACK) return;
-            if (selected == MenuOption.NEXT) {
-                if (cursor.hasNext()) {
-                    cursor.next();
-                } else {
-                    OutputHelper.printErr("This is the last redemption.");
-                    InputHelper.waitForEnter();
-                }
-            } else if (selected == MenuOption.PREVIOUS) {
-                if (cursor.hasPrevious()) {
-                    cursor.previous();
-                } else {
-                    OutputHelper.printErr("This is the first redemption.");
-                    InputHelper.waitForEnter();
-                }
-            }
-        }
-    }
-    private LoyaltyTier selectTier() {
-        LoyaltyTier[] tiers = LoyaltyTier.values();
-        OutputHelper.printOptions(new String[]{"Back", "Guest", "Silver", "Gold", "Platinum"}
-        );
-        int choice = InputHelper.readInt("Select Tier: ");
-        switch (choice) {
-            case 2:
-                return LoyaltyTier.SILVER;
-            case 3:
-                return LoyaltyTier.GOLD;
-            case 4:
-                return LoyaltyTier.PLATINUM;
-            case 1:
-            default:
-                return LoyaltyTier.GUEST;
-        }
-    }
     private LoyaltyTier[] selectPromotionTiers() {
         System.out.println("Select target tiers.");
         System.out.println("[1] Guest");
@@ -1322,11 +1058,287 @@ public class LoyaltyUI {
         System.arraycopy(result, 0, trimmedResult, 0, count);
         return trimmedResult;
     }
-    private boolean requireMemberLogin() {
-        if (currentMember == null) {
-            OutputHelper.printErr("Member login required.");
-            return true;
+    private boolean containsTier(LoyaltyTier[] tiers, LoyaltyTier tier) {
+        for (LoyaltyTier t : tiers) {
+            if (t == tier) return true;
         }
         return false;
+    }
+    private void manageRewardUI() {
+        MenuOption[] options = {
+                MenuOption.BACK,
+                MenuOption.VIEW_REWARD,
+                MenuOption.ADD_REWARD
+        };
+        for (;;) {
+            OutputHelper.clearScreen();
+            OutputHelper.printTitle("Manage Rewards");
+            MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
+            switch(selected) {
+                case BACK:
+                    return;
+                case VIEW_REWARD:
+                    viewEditRewardUI();
+                    break;
+                case ADD_REWARD:
+                    addRewardUI();
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    private void viewEditRewardUI() {
+        for (Reward reward : control.getAvailableRewards()) {
+            System.out.println("[" + reward.getRewardID() + "] " + reward.getRewardName() + " | " + reward.getRequiredPoints() + " pts | " + (reward.isAvailable() ? "Available" : "Disabled"));
+        }
+        int id = InputHelper.readInt("Enter Reward ID to edit/delete (0 to cancel) > ");
+        if (id == 0) return;
+        Reward reward = control.findRewardByID(id);
+        if (reward == null) { OutputHelper.printErr("Reward not found."); return; }
+        MenuOption[] options = {
+                MenuOption.BACK,
+                MenuOption.EDIT_REWARD,
+                MenuOption.DISABLE_REWARD
+        };
+        MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
+        switch(selected) {
+            case BACK:
+                return;
+            case EDIT_REWARD:
+                String name = InputHelper.readLine("New Name (blank to keep): ");
+                if (!name.isBlank()) reward.setRewardName(name);
+                String desc = InputHelper.readLine("New Description (blank to keep): ");
+                if (!desc.isBlank()) reward.setDescription(desc);
+                String pointsStr = InputHelper.readLine("New Required Points (blank to keep): ");
+                if (!pointsStr.isBlank()) reward.setRequiredPoints(Integer.parseInt(pointsStr));
+                OutputHelper.printOK("Reward updated.");
+                break;
+            case DISABLE_REWARD:
+                if (control.disableReward(id)) {
+                    OutputHelper.printOK("Reward disabled.");
+                } else {
+                    OutputHelper.printErr("Unable to disable reward.");
+                }
+        }
+    }
+    private void addRewardUI() {
+        String name = InputHelper.readLine("Reward Name: ");
+        String description = InputHelper.readLine("Description: ");
+        int points = InputHelper.readInt("Required Points: ");
+        OutputHelper.printOK(control.createReward(name, description, points) != null ? "Reward added." : "Unable to add reward.");
+    }
+    private void manageTierUI() {
+        MenuOption[] options = {
+                MenuOption.BACK,
+                MenuOption.REQUIREMENTS,
+                MenuOption.EDIT_TIER_REQUIREMENTS,
+                MenuOption.END_SEASON
+        };
+        for (;;) {
+            OutputHelper.clearScreen();
+            OutputHelper.printTitle("Manage Tier Requirements");
+            System.out.println("Current Season: " + control.getSeasonSummary());
+            MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
+            switch (selected) {
+                case BACK:
+                    return;
+                case REQUIREMENTS:
+                    displayAllTierRequirements();
+                    break;
+                case EDIT_TIER_REQUIREMENTS:
+                    editTierRequirementUI();
+                    break;
+                case END_SEASON:
+                    control.endSeason();
+                    OutputHelper.printOK("Season ended. New season: " + control.getSeasonSummary());
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    private void editTierRequirementUI() {
+        LoyaltyTier tier = selectTier();
+        if (tier == LoyaltyTier.GUEST) {
+            OutputHelper.printErr("Guest tier cannot be edited.");
+            return;
+        }
+        OutputHelper.printTitle("Edit Tier Requirements");
+        int upgradeRequirement = -1;
+        for (;;) {
+            if (tier != LoyaltyTier.PLATINUM) {
+                upgradeRequirement = InputHelper.readInt("New Upgrade Requirement (or -1 to skip, 0 to cancel): ");
+                if (upgradeRequirement == 0) {
+                    return;
+                } else if (upgradeRequirement < 0 && upgradeRequirement != -1) {
+                    OutputHelper.printErr("Upgrade Requirement cannot be lower than zero.");
+                    continue;
+                }
+            }
+            break;
+        }
+        int maintenanceRequirement = -1;
+        for (;;) {
+            if (tier != LoyaltyTier.SILVER) {
+                maintenanceRequirement = InputHelper.readInt("New Maintenance Requirement (or -1 to skip, 0 to cancel): ");
+                if (maintenanceRequirement == 0) {
+                    return;
+                } else if (maintenanceRequirement < 0 && maintenanceRequirement != -1) {
+                    OutputHelper.printErr("Maintenance Requirement cannot be lower than zero.");
+                    continue;
+                }
+            }
+            break;
+        }
+        String benefits = InputHelper.readLine("New benefits (or enter to skip): ");
+        if(benefits.equals("0")) return;
+        if(control.updateTierRequirement(tier, upgradeRequirement, maintenanceRequirement, benefits)) {
+            OutputHelper.printOK("Tier requirement updated.");
+        } else {
+            OutputHelper.printErr("Unable to update tier requirements, please try again later.");
+        }
+    }
+    private LoyaltyTier selectTier() {
+        OutputHelper.printOptions(new String[]{"Back", "Guest", "Silver", "Gold", "Platinum"});
+        int choice = InputHelper.readInt("Select Tier: ");
+        return switch (choice) {
+            case 2 -> LoyaltyTier.SILVER;
+            case 3 -> LoyaltyTier.GOLD;
+            case 4 -> LoyaltyTier.PLATINUM;
+            default -> LoyaltyTier.GUEST;
+        };
+    }
+    private void manageNotificationUI() {
+        MenuOption[] options = {
+                MenuOption.BACK,
+                MenuOption.VIEW_MEMBER_NOTIFICATION,
+                MenuOption.ANNOUNCE
+        };
+        for (;;) {
+            OutputHelper.clearScreen();
+            OutputHelper.printTitle("Manage Notifications");
+            MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
+            switch (selected) {
+                case BACK:
+                    return;
+                case VIEW_MEMBER_NOTIFICATION:
+                    adminViewMemberNotifications();
+                    break;
+                case ANNOUNCE:
+                    makeAnnouncement();
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    private void adminViewMemberNotifications() {
+        Member member = promptForMember();
+        if (member == null) return;
+        Notification[] notifications = control.getMemberNotifications(member);
+        if (notifications.length == 0) {
+            OutputHelper.printBlue("No notifications.");
+            return;
+        }
+        for (int i = 0; i < notifications.length; i++) {
+            System.out.println("[" + (i+1) + "] " + notifications[i].getLabel());
+        }
+        int choice = InputHelper.readInt("Select Notification (0 to cancel) > ");
+        if (choice < 1 || choice > notifications.length) return;
+        adminBrowseNotifications(control.getNotificationCursor(member, choice - 1));
+    }
+    private void adminBrowseNotifications(DoublyLinkedList<Notification>.Cursor cursor) {
+        Notification notification = cursor.next();
+        for (;;) {
+            OutputHelper.clearScreen();
+            OutputHelper.printTitle("Notification Details (Admin View)");
+            printNotification(notification);
+            MenuOption[] options = {
+                    MenuOption.BACK,
+                    MenuOption.PREVIOUS,
+                    MenuOption.NEXT
+            };
+            MenuOption selected = Menu.prompt(TITLE, "Notification Details", options);
+            switch(selected) {
+                case BACK:
+                    return;
+                case PREVIOUS:
+                    if (cursor.hasPrevious()) {
+                        cursor.previous();
+                    } else {
+                        OutputHelper.printErr("This is the first notification.");
+                        InputHelper.waitForEnter();
+                    }
+                    break;
+                case NEXT:
+                    if (cursor.hasNext()) {
+                        cursor.next();
+                    } else {
+                        OutputHelper.printErr("This is the last notification.");
+                        InputHelper.waitForEnter();
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    private void makeAnnouncement() {
+        String label = InputHelper.readLine("Announcement Label: ");
+        String message = InputHelper.readLine("Announcement Message: ");
+        control.postAnnouncement(label, message);
+        OutputHelper.printOK("Announcement broadcast successfully.");
+    }
+    private void manageRedemptionUI() {
+        Member member = promptForMember();
+        if (member == null) return;
+        Redemption[] redemptions = control.getRedemptionRecords(member);
+        if (redemptions.length == 0) {
+            OutputHelper.printBlue("No redemption records.");
+            return;
+        }
+        for (int i = 0; i < redemptions.length; i++) {
+            System.out.println("[" + (i+1) + "] " + redemptions[i].getLabel());
+        }
+        int choice = InputHelper.readInt("Select Redemption (0 to cancel) > ");
+        if (choice < 1 || choice > redemptions.length) return;
+        adminBrowseRedemptions(control.getRedemptionCursor(member, choice - 1));
+    }
+    private void adminBrowseRedemptions(DoublyLinkedList<Redemption>.Cursor cursor) {
+        Redemption redemption = cursor.next();
+        for (;;) {
+            OutputHelper.clearScreen();
+            OutputHelper.printTitle("Redemption Details (Admin View)");
+            printRedemption(redemption);
+            MenuOption[] options = {
+                    MenuOption.BACK,
+                    MenuOption.PREVIOUS,
+                    MenuOption.NEXT
+            };
+            MenuOption selected = Menu.prompt(TITLE, "Redemption Details", options);
+            switch(selected) {
+                case BACK:
+                    return;
+                case PREVIOUS:
+                    if (cursor.hasPrevious()) {
+                        cursor.previous();
+                    } else {
+                        OutputHelper.printErr("This is the first redemption.");
+                        InputHelper.waitForEnter();
+                    }
+                    break;
+                case NEXT:
+                    if (cursor.hasNext()) {
+                        cursor.next();
+                    } else {
+                        OutputHelper.printErr("This is the last redemption.");
+                        InputHelper.waitForEnter();
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 }
