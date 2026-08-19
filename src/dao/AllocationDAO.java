@@ -1,5 +1,7 @@
 package dao;
 
+import adt.CollectionInterface;
+import adt.MaxHeap;
 import entity.Allocation;
 import entity.Booking;
 import entity.SpecialCategory;
@@ -17,7 +19,10 @@ import entity.SpecialCategory;
  * to the caller's Booking objects instead of building a second copy of them.
  * <p>
  * The sort key is deliberately absent — the control computes and stores it
- * before each entry goes into the heap.
+ * before each entry goes into the heap. The collection handed back is therefore
+ * ordered on an unset key and is a transport container, nothing more: the
+ * control re-keys every entry and rebuilds the heap from the shape alone, so
+ * whatever order this one happens to be in is discarded.
  *
  * @author YZ
  */
@@ -29,28 +34,36 @@ public class AllocationDAO {
         return SEED_NOW_MINUTE;
     }
 
-    /** Entries whose confirmation number is missing from the pool come back null. */
-    public Allocation[] getAllRequests(Booking[] pool) {
+    /**
+     * The seeded requests. A confirmation number missing from the pool is
+     * skipped rather than seeded as null.
+     * <p>
+     * The pool stays a plain array: those Booking objects belong to M4 and
+     * arrive through its control, so M2 does not get to choose their container.
+     */
+    public CollectionInterface<Allocation> getAllRequests(Booking[] pool) {
+        CollectionInterface<Allocation> requests = new MaxHeap<>();
+
         // three Confirmed bookings are deliberately left out so that adding a
         // request has candidates from the first screen, without serving first
-        return new Allocation[]{
-            request(pool, "10042087", SpecialCategory.NONE, 0, 1),
-            request(pool, "47318206", SpecialCategory.NONE, 35, 2),
-            request(pool, "22905613", SpecialCategory.NONE, 20, 3),
-            request(pool, "68140379", SpecialCategory.NONE, 78, 4),
-            request(pool, "35672941", SpecialCategory.HABITABILITY, 55, 5),
-            request(pool, "81203756", SpecialCategory.NONE, 88, 6),
-            request(pool, "26718493", SpecialCategory.NONE, 8, 7),
-            request(pool, "50937164", SpecialCategory.LIFE_SAFETY, 62, 8),
-            request(pool, "18265037", SpecialCategory.NONE, 44, 9)
-        };
+        requests.add(request(pool, "10042087", SpecialCategory.NONE, 0, 1));
+        requests.add(request(pool, "47318206", SpecialCategory.NONE, 35, 2));
+        requests.add(request(pool, "22905613", SpecialCategory.NONE, 20, 3));
+        requests.add(request(pool, "68140379", SpecialCategory.NONE, 78, 4));
+        requests.add(request(pool, "35672941", SpecialCategory.HABITABILITY, 55, 5));
+        requests.add(request(pool, "81203756", SpecialCategory.NONE, 88, 6));
+        requests.add(request(pool, "26718493", SpecialCategory.NONE, 8, 7));
+        requests.add(request(pool, "50937164", SpecialCategory.LIFE_SAFETY, 62, 8));
+        requests.add(request(pool, "18265037", SpecialCategory.NONE, 44, 9));
+
+        return requests;
     }
 
     private static Allocation request(Booking[] pool, String confirmationNo,
                                       SpecialCategory category, int arrivalMinute, int entryNo) {
-        for (int i = 0; i < pool.length; i++) {
-            if (pool[i].getConfirmationNo().equals(confirmationNo)) {
-                return new Allocation(pool[i], category, arrivalMinute, entryNo);
+        for (Booking booking : pool) {
+            if (booking.getConfirmationNo().equals(confirmationNo)) {
+                return new Allocation(booking, category, arrivalMinute, entryNo);
             }
         }
         return null;

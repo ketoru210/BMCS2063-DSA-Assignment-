@@ -37,9 +37,13 @@ public class AllocationControl {
     private static final String OCCUPANCY_RESERVED = "Reserved";
     private static final String HOUSEKEEPING_READY = "Ready for Check-In";
 
-    // declared as the team ADT, not as MaxHeap: the module is written against the
-    // specification, so swapping in another implementation changes only this line
-    private final CollectionInterface<Allocation> queue = new MaxHeap<>();
+    // the heap type stays reachable because bulk build, height and level order
+    // are not expressible on an implementation-neutral ADT
+    private final MaxHeap<Allocation> heap = new MaxHeap<>();
+
+    // the same object again through the specification, so every operation the
+    // team ADT already covers is written against it and nothing has to downcast
+    private final CollectionInterface<Allocation> queue = heap;
 
     private final BookingControl bookingControl;
 
@@ -55,16 +59,20 @@ public class AllocationControl {
         this.housekeepingControl = housekeepingControl;
         clockMinute = AllocationDAO.getSeedNowMinute();
 
-        Allocation[] seeded = new AllocationDAO().getAllRequests(bookingControl.getAllBookings());
-        for (Allocation allocation : seeded) {
-            if (allocation == null) {
-                continue;
-            }
-            admit(allocation);
-            if (allocation.getEntryNo() >= nextEntryNo) {
-                nextEntryNo = allocation.getEntryNo() + 1;
+        CollectionInterface<Allocation> seeded =
+                new AllocationDAO().getAllRequests(bookingControl.getAllBookings());
+
+        // every entry is keyed before the heap is built, so the rebuild below
+        // sees the real priorities rather than the unset ones the DAO ordered on
+        Iterator<Allocation> walker = seeded.getIterator();
+        while (walker.hasNext()) {
+            Allocation entry = walker.next();
+            entry.setInvariantPriority(computeInvariantPriority(entry));
+            if (entry.getEntryNo() >= nextEntryNo) {
+                nextEntryNo = entry.getEntryNo() + 1;
             }
         }
+        heap.addAll(seeded);
     }
 
     // --- simulated clock ---
@@ -120,16 +128,24 @@ public class AllocationControl {
         return queue.getLast();
     }
 
-    /** Level order, which for this heap is array order - NOT priority order. */
+    /**
+     * Level order, which for this heap is array order - NOT priority order.
+     * <p>
+     * Taken straight off the heap's own array: walking an iterator to rebuild
+     * an array the representation already holds is work for nothing.
+     */
     public Allocation[] getLevelOrder() {
-        Allocation[] entries = new Allocation[queue.size()];
-        Iterator<Allocation> walker = queue.getIterator();
-        int i = 0;
-        while (walker.hasNext()) {
-            entries[i] = walker.next();
-            i++;
+        Object[] slots = heap.toLevelOrderArray();
+        Allocation[] entries = new Allocation[slots.length];
+        for (int i = 0; i < slots.length; i++) {
+            entries[i] = (Allocation) slots[i];
         }
         return entries;
+    }
+
+    /** Levels the queue spans when drawn as the tree it is; 0 when empty. */
+    public int getQueueHeight() {
+        return heap.getHeight();
     }
 
     /**

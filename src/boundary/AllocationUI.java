@@ -165,7 +165,8 @@ public class AllocationUI {
      * up front. The root is highlighted because it is always served next.
      */
     private void printTree(Allocation[] levelOrder, Allocation[] serveOrder) {
-        int layers = layersFor(levelOrder.length);
+        // the heap knows its own depth; the drawing does not recompute it
+        int layers = control.getQueueHeight();
 
         // labelled up front because the cell has to fit the widest of them, and
         // every row's geometry is derived from the cell
@@ -274,15 +275,6 @@ public class AllocationUI {
                 System.out.println(row);
             }
         }
-    }
-
-    /** Smallest L with 2^L - 1 >= n. Integer loop, so no floating-point rounding. */
-    private int layersFor(int numOfEntries) {
-        int layers = 0;
-        while (((1 << layers) - 1) < numOfEntries) {
-            layers++;
-        }
-        return layers;
     }
 
     private String labelOf(Allocation entry, Allocation[] serveOrder) {
@@ -420,6 +412,7 @@ public class AllocationUI {
      * and the comparison all arrive as values.
      */
     private void starvationReport() {
+        OutputHelper.clearScreen();
         if (control.isEmpty()) {
             fail("Nobody is waiting.");
             return;
@@ -542,6 +535,7 @@ public class AllocationUI {
 
     /** Allocates the queue on paper. Nothing here or in the control writes back. */
     private void forecastReport() {
+        OutputHelper.clearScreen();
         if (control.isEmpty()) {
             fail("Nobody is waiting.");
             return;
