@@ -237,7 +237,6 @@ public class LoyaltyControl {
     }
     private LoyaltyTier downgradeOneStep(LoyaltyTier tier) {
         if (tier == LoyaltyTier.PLATINUM) return LoyaltyTier.GOLD;
-        if (tier == LoyaltyTier.GOLD) return LoyaltyTier.SILVER;
         return LoyaltyTier.SILVER;
     }
     public void refreshMemberState(Member member) {
@@ -347,11 +346,11 @@ public class LoyaltyControl {
         }
         return count;
     }
-    public boolean addNotification(Member member, String label, String message, NotificationType type) {
-        if (member == null || label == null || label.isBlank() || message == null || message.isBlank() || type == null) return false;
+    public void addNotification(Member member, String label, String message, NotificationType type) {
+        if (member == null || label == null || label.isBlank() || message == null || message.isBlank() || type == null) return;
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
         Notification notification = new Notification(label, message, date, type);
-        return member.getNotificationRecords().add(notification);
+        member.getNotificationRecords().add(notification);
     }
     public boolean removeNotification(Member member, Notification notification) {
         if (member == null || notification == null) return false;
@@ -427,40 +426,25 @@ public class LoyaltyControl {
         reward.disableReward();
         return true;
     }
-    public boolean updateTierUpgradeRequirement(LoyaltyTier tier, int points) {
-        if (tier == null || points < 0) return false;
+    public boolean updateTierRequirement(LoyaltyTier tier, int updateRequirement, int maintenanceRequirement, String benefits) {
+        if (tier == null) return false;
         TierRequirement requirement = findTierRequirement(tier);
         if (requirement == null) return false;
-        requirement.changePointsToUpgradeTier(points);
+        if (updateRequirement != -1) requirement.changePointsToUpgradeTier(updateRequirement);
+        if (maintenanceRequirement != -1) requirement.changePointsToDowngradeTier(maintenanceRequirement);
+        if (!benefits.isEmpty())requirement.changeBenefits(benefits);
         return true;
     }
-    public boolean updateTierDowngradeRequirement(LoyaltyTier tier, int points) {
-        if (tier == null || points < 0) return false;
-        TierRequirement requirement = findTierRequirement(tier);
-        if (requirement == null) return false;
-        requirement.changePointsToDowngradeTier(points);
-        return true;
-    }
-    public boolean updateTierBenefits(LoyaltyTier tier, String benefits) {
-        if (tier == null || benefits == null || benefits.isBlank()) return false;
-        TierRequirement requirement = findTierRequirement(tier);
-        if (requirement == null) return false;
-        requirement.changeBenefits(benefits);
-        return true;
-    }
-    public boolean postAnnouncement(Member member, String label, String message) {
-        return addNotification(member, label, message, NotificationType.ANNOUNCEMENT);
-    }
-    public void broadcastAnnouncement(String label, String message) {
+    public void postAnnouncement(String label, String message) {
         Iterator<Member> iterator = memberDoublyLinkedList.getIterator();
         while (iterator.hasNext()) {
             Member member = iterator.next();
             addNotification(member, label, message, NotificationType.ANNOUNCEMENT);
         }
     }
-    public boolean postPromotionNotification(Member member, Promotion promotion) {
-        if (member == null || promotion == null) return false;
-        return addNotification(member, promotion.getLabel(), promotion.getDescription(), NotificationType.PROMOTION);
+    public void postPromotionNotification(Member member, Promotion promotion) {
+        if (member == null || promotion == null) return;
+        addNotification(member, promotion.getLabel(), promotion.getDescription(), NotificationType.PROMOTION);
     }
     public DoublyLinkedList<Tier>.Cursor getTierCursor(Member member, int startIndex) {
         DoublyLinkedList<Tier>.Cursor cursor = member.getTierCursor();
