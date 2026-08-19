@@ -15,6 +15,8 @@ import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
 import utility.OutputHelper;
+import utility.TableRenderer;
+import utility.TableRenderer.Align;
 
 public class LoyaltyUI {
     private static final String TITLE = "Loyalty and Rewards Service";
@@ -81,6 +83,7 @@ public class LoyaltyUI {
                     MenuOption.GUEST_LOGIN,
                     MenuOption.REGISTER
             };
+            OutputHelper.clearScreen();
             MenuOption selected = Menu.prompt(TITLE, "Welcome!", loginOptions);
             if (selected == MenuOption.BACK) return;
             switch (selected) {
@@ -197,6 +200,7 @@ public class LoyaltyUI {
             if (currentMember == null) return;
             int unread = control.countUnreadNotifications(currentMember);
             String banner = "Welcome, " + currentMember.getName() + ". You have " + unread + " unread notifications.";
+            OutputHelper.clearScreen();
             MenuOption selected = Menu.prompt(TITLE, banner, memberOptions);
             switch (selected) {
                 case LOGOUT:
@@ -234,6 +238,7 @@ public class LoyaltyUI {
                 MenuOption.NOTIFICATION
         };
         for (;;) {
+            OutputHelper.clearScreen();
             MenuOption selected = Menu.prompt(TITLE, "Guest Menu", guestOptions);
             if (selected == MenuOption.BACK) return;
             switch (selected) {
@@ -257,6 +262,7 @@ public class LoyaltyUI {
                     MenuOption.BACK,
                     MenuOption.MEMBER_LOGIN
             };
+            OutputHelper.clearScreen();
             MenuOption selected = Menu.prompt(TITLE, "You're currently a guest. Please log in to view your profile.", loginOptions);
             if (selected == MenuOption.MEMBER_LOGIN) {
                 if (memberLoginUI()) memberMenu();
@@ -272,6 +278,7 @@ public class LoyaltyUI {
                 MenuOption.CHANGE_PASSWORD
         };
         for (;;) {
+            OutputHelper.clearScreen();
             MenuOption selected = Menu.prompt(TITLE, "Manage Profile", profileOptions);
             if (selected == MenuOption.BACK) return;
             switch (selected) {
@@ -330,6 +337,12 @@ public class LoyaltyUI {
             return password;
         }
     }
+    private void print(String[] rows) {
+        for (int i = 0; i < rows.length; i++) {
+            System.out.println(rows[i]);
+        }
+    }
+
     private void statusUI() {
         control.refreshMemberState(currentMember);
         for (;;) {
@@ -393,9 +406,15 @@ public class LoyaltyUI {
         for (;;) {
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Tier History");
+            String[][] cells = new String[records.length][];
             for (int i = 0; i < records.length; i++) {
-                System.out.println("[" + (i + 1) + "] " + records[i].getLoyaltyTier() + " (" + records[i].getSeason() + ")");
+                cells[i] = new String[]{
+                    String.valueOf(i + 1),
+                    String.valueOf(records[i].getLoyaltyTier()),
+                    records[i].getSeason()
+                };
             }
+            print(TableRenderer.renderBordered(new String[]{"No.", "Tier", "Season"}, cells, null));
             System.out.println();
             MenuOption[] options = { MenuOption.BACK, MenuOption.SELECT };
             MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
@@ -496,13 +515,21 @@ public class LoyaltyUI {
             Reward[] rewards = control.getAvailableRewards();
             int availableCount = 0;
             for (Reward reward : rewards) {
-                if (!reward.isAvailable()) continue;
-                availableCount++;
-                System.out.println("[" + reward.getRewardID() + "] " + reward.getRewardName());
-                System.out.println("    Points Required: " + reward.getRequiredPoints());
-                System.out.println("    " + reward.getDescription());
-                System.out.println();
+                if (reward.isAvailable()) availableCount++;
             }
+            String[][] cells = new String[availableCount][];
+            int row = 0;
+            for (Reward reward : rewards) {
+                if (!reward.isAvailable()) continue;
+                cells[row++] = new String[]{
+                    String.valueOf(reward.getRewardID()),
+                    reward.getRewardName(),
+                    String.valueOf(reward.getRequiredPoints()),
+                    reward.getDescription()
+                };
+            }
+            print(TableRenderer.renderBordered(new String[]{"ID", "Reward", "Points", "Description"},
+                    cells, new Align[]{Align.LEFT, Align.LEFT, Align.RIGHT, Align.LEFT}));
             if (availableCount == 0) {
                 System.out.println("No rewards are currently available.");
                 InputHelper.waitForEnter();
@@ -551,9 +578,14 @@ public class LoyaltyUI {
         for (;;) {
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Redemption History");
-            for (Redemption redemption : redemptions) {
-                System.out.println("[" + redemption.getRedemptionID() + "] " + redemption.getLabel());
+            String[][] cells = new String[redemptions.length][];
+            for (int i = 0; i < redemptions.length; i++) {
+                cells[i] = new String[]{
+                    String.valueOf(redemptions[i].getRedemptionID()),
+                    redemptions[i].getLabel()
+                };
             }
+            print(TableRenderer.renderBordered(new String[]{"ID", "Redemption"}, cells, null));
             System.out.println();
             MenuOption[] options = {
                     MenuOption.BACK,
@@ -640,9 +672,11 @@ public class LoyaltyUI {
         for (;;) {
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Promotions");
+            String[][] cells = new String[promotions.length][];
             for (int i = 0; i < promotions.length; i++) {
-                System.out.println("[" + (i + 1) + "] " + promotions[i].getLabel());
+                cells[i] = new String[]{String.valueOf(i + 1), promotions[i].getLabel()};
             }
+            print(TableRenderer.renderBordered(new String[]{"No.", "Promotion"}, cells, null));
             System.out.println();
             MenuOption[] options = {
                     MenuOption.BACK,
@@ -737,9 +771,15 @@ public class LoyaltyUI {
         for (;;) {
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Notifications");
+            String[][] cells = new String[notifications.length][];
             for (int i = 0; i < notifications.length; i++) {
-                System.out.println("[" + (i + 1) + "] " + notifications[i].getLabel() + " | " + (notifications[i].getIsRead() ? "Read" : "Unread"));
+                cells[i] = new String[]{
+                    String.valueOf(i + 1),
+                    notifications[i].getLabel(),
+                    notifications[i].getIsRead() ? "Read" : "Unread"
+                };
             }
+            print(TableRenderer.renderBordered(new String[]{"No.", "Notification", "State"}, cells, null));
             System.out.println();
             MenuOption[] options = {
                     MenuOption.BACK,
@@ -885,9 +925,18 @@ public class LoyaltyUI {
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Manage Members");
             Member[] members = control.getAllMembers();
-            for (Member member : members) {
-                System.out.println("[" + member.getMemberID() + "] " + member.getName() + " | " + member.getUsername() + " | Tier: " + member.getCurrentTier() + " | Points: " + member.getCurrentPoints());
+            String[][] cells = new String[members.length][];
+            for (int i = 0; i < members.length; i++) {
+                cells[i] = new String[]{
+                    members[i].getMemberID(),
+                    members[i].getName(),
+                    members[i].getUsername(),
+                    String.valueOf(members[i].getCurrentTier()),
+                    String.valueOf(members[i].getCurrentPoints())
+                };
             }
+            print(TableRenderer.renderBordered(new String[]{"Member ID", "Name", "Username", "Tier", "Points"},
+                    cells, new Align[]{Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT, Align.RIGHT}));
             System.out.println();
             MenuOption[] options = {
                     MenuOption.BACK,
@@ -982,9 +1031,11 @@ public class LoyaltyUI {
             OutputHelper.printBlue("No promotions available.");
             return;
         }
+        String[][] cells = new String[promotions.length][];
         for (int i = 0; i < promotions.length; i++) {
-            System.out.println("[" + (i+1) + "] " + promotions[i].getLabel() + " (expires " + promotions[i].getExpiryDate() + ")");
+            cells[i] = new String[]{String.valueOf(i + 1), promotions[i].getLabel(), promotions[i].getExpiryDate()};
         }
+        print(TableRenderer.renderBordered(new String[]{"No.", "Promotion", "Expires"}, cells, null));
         int choice = InputHelper.readInt("Select Promotion (0 to cancel) > ");
         if (choice < 1 || choice > promotions.length) return;
         Promotion promotion = promotions[choice - 1];
@@ -1089,9 +1140,18 @@ public class LoyaltyUI {
         }
     }
     private void viewEditRewardUI() {
-        for (Reward reward : control.getAvailableRewards()) {
-            System.out.println("[" + reward.getRewardID() + "] " + reward.getRewardName() + " | " + reward.getRequiredPoints() + " pts | " + (reward.isAvailable() ? "Available" : "Disabled"));
+        Reward[] catalogue = control.getAvailableRewards();
+        String[][] cells = new String[catalogue.length][];
+        for (int i = 0; i < catalogue.length; i++) {
+            cells[i] = new String[]{
+                String.valueOf(catalogue[i].getRewardID()),
+                catalogue[i].getRewardName(),
+                String.valueOf(catalogue[i].getRequiredPoints()),
+                catalogue[i].isAvailable() ? "Available" : "Disabled"
+            };
         }
+        print(TableRenderer.renderBordered(new String[]{"ID", "Reward", "Points", "State"},
+                cells, new Align[]{Align.LEFT, Align.LEFT, Align.RIGHT, Align.LEFT}));
         int id = InputHelper.readInt("Enter Reward ID to edit/delete (0 to cancel) > ");
         if (id == 0) return;
         Reward reward = control.findRewardByID(id);
@@ -1241,9 +1301,11 @@ public class LoyaltyUI {
             OutputHelper.printBlue("No notifications.");
             return;
         }
+        String[][] cells = new String[notifications.length][];
         for (int i = 0; i < notifications.length; i++) {
-            System.out.println("[" + (i+1) + "] " + notifications[i].getLabel());
+            cells[i] = new String[]{String.valueOf(i + 1), notifications[i].getLabel()};
         }
+        print(TableRenderer.renderBordered(new String[]{"No.", "Notification"}, cells, null));
         int choice = InputHelper.readInt("Select Notification (0 to cancel) > ");
         if (choice < 1 || choice > notifications.length) return;
         adminBrowseNotifications(control.getNotificationCursor(member, choice - 1));
@@ -1298,9 +1360,11 @@ public class LoyaltyUI {
             OutputHelper.printBlue("No redemption records.");
             return;
         }
+        String[][] cells = new String[redemptions.length][];
         for (int i = 0; i < redemptions.length; i++) {
-            System.out.println("[" + (i+1) + "] " + redemptions[i].getLabel());
+            cells[i] = new String[]{String.valueOf(i + 1), redemptions[i].getLabel()};
         }
+        print(TableRenderer.renderBordered(new String[]{"No.", "Redemption"}, cells, null));
         int choice = InputHelper.readInt("Select Redemption (0 to cancel) > ");
         if (choice < 1 || choice > redemptions.length) return;
         adminBrowseRedemptions(control.getRedemptionCursor(member, choice - 1));

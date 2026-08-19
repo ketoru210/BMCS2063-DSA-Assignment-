@@ -9,6 +9,7 @@ import control.LoyaltyControl;
 import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
+import utility.OutputHelper;
 
 public class Main {
     private static final String TITLE = "TARUMT Resorts";
@@ -73,6 +74,7 @@ public class Main {
 
     public static void main(String[] args) {
         for (;;) {
+            OutputHelper.clearScreen();
             MenuOption selected = Menu.prompt(TITLE, BANNER, MenuOption.values());
 
             if (selected == MenuOption.EXIT) {

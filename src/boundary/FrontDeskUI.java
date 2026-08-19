@@ -6,21 +6,24 @@ import entity.RoomType;
 import utility.InputHelper;
 import utility.MenuItem;
 import utility.OutputHelper;
+import utility.TableRenderer;
+import utility.TableRenderer.Align;
+import utility.TreeRenderer;
 
 /**
  * Boundary: CLI for Front-Desk Service (Module 4).
  * <p>
- * The tree is drawn sideways with the largest confirmation number at the top, so
- * reading the screen downwards is the in-order traversal and the shape of the
- * tree is visible at the same time. Drawing it upright would need the full width
- * of eight-digit keys at every level, which does not fit a console.
+ * The tree is drawn upright and whole, keys only. Nodes are placed by in-order
+ * position, so reading a row left to right is the in-order traversal, every
+ * parent sits between its own subtrees, and the width follows the number of
+ * bookings instead of doubling with the height.
  *
  * @author QW
  */
 public class FrontDeskUI {
 
     private static final String TITLE = "Front-Desk Service";
-    private static final String INDENT = "      ";
+    private static final int TREE_GAP = 2;
 
     private final BookingControl control;
 
@@ -127,20 +130,21 @@ public class FrontDeskUI {
             OutputHelper.printBlue("(no bookings on file)\n");
             return;
         }
-        System.out.println("Bookings by confirmation no. (highest at top, "
-                + control.size() + " on file, height " + control.getTreeHeight() + ")\n");
-        drawSlot(shape, 0, 0);
-        System.out.println();
-    }
 
-    private void drawSlot(Booking[] shape, int index, int depth) {
-        if (index >= shape.length || shape[index] == null) {
-            return;
+        String[] slots = new String[shape.length];
+        for (int i = 0; i < shape.length; i++) {
+            if (shape[i] != null) {
+                slots[i] = shape[i].getConfirmationNo();
+            }
         }
-        drawSlot(shape, 2 * index + 2, depth + 1);
-        System.out.println(INDENT.repeat(depth) + shape[index].getConfirmationNo()
-                + "  " + shape[index].getMember().getName());
-        drawSlot(shape, 2 * index + 1, depth + 1);
+
+        System.out.println("Bookings by confirmation no. ("
+                + control.size() + " on file, height " + control.getTreeHeight() + ")\n");
+        String[] rows = TreeRenderer.renderCompact(slots, TREE_GAP);
+        for (int i = 0; i < rows.length; i++) {
+            System.out.println(rows[i]);
+        }
+        System.out.println();
     }
 
     private void newWalkIn() {
@@ -170,8 +174,18 @@ public class FrontDeskUI {
     private RoomType readRoomType() {
         RoomType[] types = RoomType.values();
         System.out.println();
+        String[][] cells = new String[types.length][];
         for (int i = 0; i < types.length; i++) {
-            System.out.println("[" + (i + 1) + "] " + types[i] + " - " + money(types[i].getRatePerNight()) + " / night");
+            cells[i] = new String[]{
+                String.valueOf(i + 1),
+                String.valueOf(types[i]),
+                money(types[i].getRatePerNight()) + " / night"
+            };
+        }
+        String[] menu = TableRenderer.renderBordered(new String[]{"No.", "Room Type", "Rate"},
+                cells, new Align[]{Align.LEFT, Align.LEFT, Align.RIGHT});
+        for (int i = 0; i < menu.length; i++) {
+            System.out.println(menu[i]);
         }
         int choice = InputHelper.readInt("Room type > ");
         if (choice < 1 || choice > types.length) {
@@ -339,18 +353,24 @@ public class FrontDeskUI {
             return;
         }
 
-        System.out.printf("  %-12s %-18s %-8s %-6s %-12s %s%n",
-                "CONF NO", "GUEST", "TYPE", "NIGHTS", "STATUS", "CHARGE");
+        String[] headers = {"CONF NO", "GUEST", "TYPE", "NIGHTS", "STATUS", "CHARGE"};
+        Align[] aligns = {Align.LEFT, Align.LEFT, Align.LEFT, Align.RIGHT, Align.LEFT, Align.RIGHT};
+        String[][] cells = new String[batch.length][];
         for (int i = 0; i < batch.length; i++) {
             // a cancelled row is still listed, but shows no money against it
             boolean earns = control.earnsRevenue(batch[i]);
-            System.out.printf("  %-12s %-18s %-8s %-6d %-12s %s%n",
-                    batch[i].getConfirmationNo(),
-                    batch[i].getMember().getName(),
-                    batch[i].getRoomType(),
-                    batch[i].getNights(),
-                    batch[i].getStatus(),
-                    earns ? money(control.revenueOf(batch[i])) : "-");
+            cells[i] = new String[]{
+                batch[i].getConfirmationNo(),
+                batch[i].getMember().getName(),
+                String.valueOf(batch[i].getRoomType()),
+                String.valueOf(batch[i].getNights()),
+                batch[i].getStatus(),
+                earns ? money(control.revenueOf(batch[i])) : "-"
+            };
+        }
+        String[] rows = TableRenderer.render(headers, cells, aligns);
+        for (int i = 0; i < rows.length; i++) {
+            System.out.println("  " + rows[i]);
         }
 
         double total = control.totalRevenueOf(batch);
@@ -365,11 +385,22 @@ public class FrontDeskUI {
 
         RoomType[] types = RoomType.values();
         double[] revenue = control.revenueByRoomType(batch);
-        System.out.println("  Charge by room type");
+        String[] shareHeaders = {"ROOM TYPE", "CHARGE", "SHARE", ""};
+        Align[] shareAligns = {Align.LEFT, Align.RIGHT, Align.RIGHT, Align.LEFT};
+        String[][] shareCells = new String[types.length][];
         for (int i = 0; i < types.length; i++) {
             double share = total == 0.0 ? 0.0 : revenue[i] * 100.0 / total;
-            System.out.printf("    %-8s %12s  %5.1f%%  %s%n",
-                    types[i], money(revenue[i]), share, bar(share));
+            shareCells[i] = new String[]{
+                String.valueOf(types[i]),
+                money(revenue[i]),
+                String.format("%.1f%%", share),
+                bar(share)
+            };
+        }
+        System.out.println("  Charge by room type");
+        String[] shareRows = TableRenderer.render(shareHeaders, shareCells, shareAligns);
+        for (int i = 1; i < shareRows.length; i++) {
+            System.out.println("    " + shareRows[i]);
         }
         InputHelper.waitForEnter();
     }

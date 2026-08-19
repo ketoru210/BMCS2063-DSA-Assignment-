@@ -13,6 +13,9 @@ import entity.SpecialCategory;
 import utility.InputHelper;
 import utility.MenuItem;
 import utility.OutputHelper;
+import utility.TableRenderer;
+import utility.TableRenderer.Align;
+import utility.TreeRenderer;
 
 /**
  * Boundary: CLI for VIP &amp; Loyalty Tier-Priority Room Allocation (Module 2).
@@ -159,120 +162,61 @@ public class AllocationUI {
     }
 
     /**
-     * Draws the heap array as a centred binary tree. Level order is already the
-     * array order, so no traversal and no node objects are needed — but the
-     * branch rows need both layers' centres at once, so every label is measured
-     * up front. The root is highlighted because it is always served next.
+     * Draws the queue as the binary tree the heap actually is. Level order is
+     * already the array order, so no traversal and no node objects are needed.
+     * The root is highlighted because it is always served next.
      */
     private void printTree(Allocation[] levelOrder, Allocation[] serveOrder) {
-        // the heap knows its own depth; the drawing does not recompute it
-        int layers = control.getQueueHeight();
-
-        // labelled up front because the cell has to fit the widest of them, and
-        // every row's geometry is derived from the cell
-        String[] flat = new String[levelOrder.length];
-        int cell = MIN_CELL;
+        String[] slots = new String[levelOrder.length];
         for (int i = 0; i < levelOrder.length; i++) {
-            flat[i] = labelOf(levelOrder[i], serveOrder);
-            cell = Math.max(cell, flat[i].length() + 2);
+            slots[i] = labelOf(levelOrder[i], serveOrder);
         }
 
-        String[][] labels = new String[layers][];
-        int[][] centres = new int[layers][];
-
-        // calculate the needed value first (where is the node, how many node, how long the width)
-        for (int depth = 0; depth < layers; depth++) {
-            // (1 << n) means (1 * 2 ^ n)
-            // - use this instead if Math.pow() is because i want result value in integer type
-            int first = (1 << depth) - 1;  // index in array of first node of the current layer
-            int count = Math.min(1 << depth, levelOrder.length - first);  // number of node of the current layer
-            int block = cell * (1 << (layers - 1 - depth));  // width of node
-
-            labels[depth] = new String[count];
-            centres[depth] = new int[count];
-            for (int k = 0; k < count; k++) {
-                String label = flat[first + k];
-                int column = k * block + (block - label.length()) / 2;
-                labels[depth][k] = label;
-                centres[depth][k] = column + (label.length() - 1) / 2;
-            }
-        }
-
-        for (int depth = 0; depth < layers; depth++) {
-            String row = rowOf(labels[depth], centres[depth]);
-            if (depth == 0) {
-                OutputHelper.printOK(row);
+        // the heap knows its own depth; the drawing does not recompute it
+        String[] rows = TreeRenderer.renderComplete(slots, control.getQueueHeight(), MIN_CELL);
+        for (int i = 0; i < rows.length; i++) {
+            if (i == 0) {
+                OutputHelper.printOK(rows[i]);
             } else {
-                System.out.println(row);
-            }
-            if (depth + 1 < layers) {
-                System.out.println(branchRow(centres[depth + 1]));
+                System.out.println(rows[i]);
             }
         }
+
         System.out.println();
         OutputHelper.printBlue("  #n = entry no. (permanent)    (n) = serve order");
         OutputHelper.printOK("  next serve: #" + serveOrder[0].getEntryNo());
     }
 
-    private String rowOf(String[] labels, int[] centres) {
-        StringBuilder line = new StringBuilder();
-        for (int k = 0; k < labels.length; k++) {
-            int start = centres[k] - (labels[k].length() - 1) / 2;
-            while (line.length() < start) {
-                line.append(' ');
-            }
-            line.append(labels[k]);
-        }
-        return line.toString();
-    }
-
-    /**
-     * Brackets each sibling pair. A single slash cannot span the gap — the
-     * horizontal distance to a child is a quarter of the parent's block, far
-     * more than one column — so the dashes carry the distance and the slashes
-     * only mark which end is whose.
-     */
-    private String branchRow(int[] childCentres) {
-        StringBuilder line = new StringBuilder();
-        for (int k = 0; k < childCentres.length; k += 2) {
-            while (line.length() < childCentres[k]) {
-                line.append(' ');
-            }
-            line.append('/');
-
-            if (k + 1 < childCentres.length) {
-                while (line.length() < childCentres[k + 1]) {
-                    line.append('-');
-                }
-                line.append('\\');
-            }
-        }
-        return line.toString();
-    }
-
     private void printTable(Allocation[] serveOrder) {
-        OutputHelper.printBlue(String.format("%2s  %-6s %-17s %-9s %-13s %7s %6s %7s",
-                "#", "Entry", "Guest", "Tier", "Special", "Waited", "P(0)", "P(now)"));
+        String[] headers = {"#", "Entry", "Guest", "Tier", "Special", "Waited", "P(0)", "P(now)"};
+        Align[] aligns = {Align.RIGHT, Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT,
+                Align.RIGHT, Align.RIGHT, Align.RIGHT};
 
+        String[][] cells = new String[serveOrder.length][];
         for (int i = 0; i < serveOrder.length; i++) {
             Allocation entry = serveOrder[i];
             boolean scored = entry.getCategory() == SpecialCategory.NONE;
 
-            String row = String.format("%2d  #%-5d %-17s %-9s %-13s %3d min %6s %7s",
-                    i + 1,
-                    entry.getEntryNo(),
-                    entry.getBooking().getMember().getName(),
-                    entry.getTier(),
-                    entry.getCategory(),
-                    control.getClockMinute() - entry.getArrivalMinute(),
-                    scored ? String.valueOf(entry.getInvariantPriority()) : DEAD_SCORE,
-                    scored ? String.valueOf(control.livePriority(entry)) : DEAD_SCORE);
+            cells[i] = new String[]{
+                String.valueOf(i + 1),
+                "#" + entry.getEntryNo(),
+                entry.getBooking().getMember().getName(),
+                String.valueOf(entry.getTier()),
+                String.valueOf(entry.getCategory()),
+                (control.getClockMinute() - entry.getArrivalMinute()) + " min",
+                scored ? String.valueOf(entry.getInvariantPriority()) : DEAD_SCORE,
+                scored ? String.valueOf(control.livePriority(entry)) : DEAD_SCORE
+            };
+        }
 
-            // the first row is the root of the tree above — same entry, same color
-            if (i == 0) {
-                OutputHelper.printOK(row);
+        String[] rows = TableRenderer.render(headers, cells, aligns);
+        OutputHelper.printBlue(rows[0]);
+        for (int i = 1; i < rows.length; i++) {
+            // the first entry is the root of the tree above — same entry, same color
+            if (i == 1) {
+                OutputHelper.printOK(rows[i]);
             } else {
-                System.out.println(row);
+                System.out.println(rows[i]);
             }
         }
     }
@@ -478,28 +422,38 @@ public class AllocationUI {
         if (rows.length == 0) {
             OutputHelper.printBlue("  No entry matches that filter.");
         } else {
-            System.out.printf("%-6s %-17s %-9s %-13s %8s %8s %11s%n",
-                    "Entry", "Guest", "Tier", "Special", "Waited", "Immune@", "Remaining");
+            String[] headers = {"Entry", "Guest", "Tier", "Special", "Waited", "Immune@", "Remaining"};
+            Align[] aligns = {Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT,
+                    Align.RIGHT, Align.RIGHT, Align.RIGHT};
+
+            String[][] cells = new String[rows.length][];
+            boolean[] safe = new boolean[rows.length];
             for (int i = 0; i < rows.length; i++) {
                 Allocation entry = rows[i];
                 boolean protectedByCategory = control.isCategoryProtected(entry);
                 int exposure = control.getExposure(entry, challenger);
+                safe[i] = exposure == 0;
 
-                String line = String.format("#%-5d %-17s %-9s %-13s %4d min %8s %11s",
-                        entry.getEntryNo(),
-                        entry.getBooking().getMember().getName(),
-                        entry.getTier(),
-                        entry.getCategory(),
-                        control.getWaited(entry),
-                        protectedByCategory ? DEAD_SCORE
-                                : String.valueOf(control.getImmuneAt(entry, challenger)),
-                        protectedByCategory ? "immune *"
-                                : (exposure == 0 ? "immune" : exposure + " min"));
+                cells[i] = new String[]{
+                    "#" + entry.getEntryNo(),
+                    entry.getBooking().getMember().getName(),
+                    String.valueOf(entry.getTier()),
+                    String.valueOf(entry.getCategory()),
+                    control.getWaited(entry) + " min",
+                    protectedByCategory ? DEAD_SCORE
+                            : String.valueOf(control.getImmuneAt(entry, challenger)),
+                    protectedByCategory ? "immune *"
+                            : (exposure == 0 ? "immune" : exposure + " min")
+                };
+            }
 
-                if (exposure == 0) {
-                    OutputHelper.printOK(line);
+            String[] table = TableRenderer.render(headers, cells, aligns);
+            OutputHelper.printBlue(table[0]);
+            for (int i = 1; i < table.length; i++) {
+                if (safe[i - 1]) {
+                    OutputHelper.printOK(table[i]);
                 } else {
-                    System.out.println(line);
+                    System.out.println(table[i]);
                 }
             }
             OutputHelper.printBlue("  * outranked on category, which no ordinary arrival can reach");

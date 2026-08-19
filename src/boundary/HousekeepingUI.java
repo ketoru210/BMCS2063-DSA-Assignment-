@@ -8,6 +8,7 @@ import utility.InputHelper;
 import utility.Menu;
 import utility.MenuItem;
 import utility.OutputHelper;
+import utility.TableRenderer;
 import java.util.Iterator;
 
 /**
@@ -16,6 +17,8 @@ import java.util.Iterator;
  * @author Pujin
  */
 public class HousekeepingUI {
+
+    private static final String[] LOG_HEADERS = {"No.", "Room No", "Previous Status", "New Status"};
 
     private static final String TITLE = "Housekeeping and Task Log";
     private final HousekeepingControl control;
@@ -54,7 +57,8 @@ public class HousekeepingUI {
 
     public void run() {
         for (;;) {
-            MenuOption selected = Menu.prompt(TITLE, MenuOption.values());
+            OutputHelper.clearScreen();
+            MenuOption selected = Menu.prompt(TITLE, null, MenuOption.values());
 
             switch (selected) {
                 case BACK:
@@ -89,25 +93,34 @@ public class HousekeepingUI {
 
     private void viewRooms() {
         Room[] rooms = control.getAllRooms();
-        String divider = "+---------+----------+------------------+------------------------+";
-
         OutputHelper.printBlue("\n--- Current Master Room Registry ---");
-        System.out.println(divider);
-        System.out.printf("| %-7s | %-8s | %-16s | %-22s |%n",
-                "Room No", "Type", "Occupancy", "Housekeeping Status");
-        System.out.println(divider);
 
+        int count = 0;
+        for (int i = 0; i < rooms.length; i++) {
+            if (rooms[i] != null) {
+                count++;
+            }
+        }
+
+        String[] headers = {"Room No", "Type", "Occupancy", "Housekeeping Status"};
+        String[][] cells = new String[count][];
+        int row = 0;
         for (int i = 0; i < rooms.length; i++) {
             Room r = rooms[i];
             if (r != null) {
-                System.out.printf("| %-7s | %-8s | %-16s | %-22s |%n",
-                        r.getRoomNo(),
-                        r.getRoomType(),
-                        r.getOccupancyStatus(),
-                        r.getHousekeepingStatus());
+                cells[row++] = new String[]{
+                    r.getRoomNo(),
+                    String.valueOf(r.getRoomType()),
+                    r.getOccupancyStatus(),
+                    r.getHousekeepingStatus()
+                };
             }
         }
-        System.out.println(divider);
+
+        String[] table = TableRenderer.renderBordered(headers, cells, null);
+        for (int i = 0; i < table.length; i++) {
+            System.out.println(table[i]);
+        }
 
         while (true) {
             String choice = InputHelper.readLine("\nDo you want to update a room status now? (y/n) > ");
@@ -218,50 +231,51 @@ public class HousekeepingUI {
         OutputHelper.printBlue("\n--- Housekeeping Action History Log ---");
         System.out.println("Stack Status: [Undo Depth: " + control.getUndoCount() + "] | [Redo Depth: " + control.getRedoCount() + "]");
 
-        String divider = "+-----+----------+-----------------------+-----------------------+";
         Iterator<HousekeepingTask> undoIt = control.getTaskLogIterator();
 
         if (!undoIt.hasNext()) {
             System.out.println("\n[Active Undo Stack]: Empty (No active task history)");
         } else {
             System.out.println("\n[Active Actions - Undo Stack (Most Recent First)]:");
-            System.out.println(divider);
-            System.out.printf("| %-3s | %-8s | %-21s | %-21s |%n", "No.", "Room No", "Previous Status", "New Status");
-            System.out.println(divider);
-
-            int index = 1;
-            while (undoIt.hasNext()) {
+            String[][] undoCells = new String[control.getUndoCount()][];
+            int index = 0;
+            while (undoIt.hasNext() && index < undoCells.length) {
                 HousekeepingTask t = undoIt.next();
-                System.out.printf("| %-3d | %-8s | %-21s | %-21s |%n",
-                        index,
-                        t.getRoom().getRoomNo(),
-                        t.getPreviousStatus(),
-                        t.getNewStatus());
+                undoCells[index] = new String[]{
+                    String.valueOf(index + 1),
+                    t.getRoom().getRoomNo(),
+                    t.getPreviousStatus(),
+                    t.getNewStatus()
+                };
                 index++;
             }
-            System.out.println(divider);
+            String[] undoTable = TableRenderer.renderBordered(LOG_HEADERS, undoCells, null);
+            for (int i = 0; i < undoTable.length; i++) {
+                System.out.println(undoTable[i]);
+            }
         }
 
         Iterator<HousekeepingTask> redoIt = control.getRedoLogIterator();
         if (redoIt != null && redoIt.hasNext()) {
             System.out.println("\n[Undone Actions Awaiting Redo - Redo Stack]:");
-            System.out.println(divider);
-            System.out.printf("| %-3s | %-8s | %-21s | %-21s |%n", "No.", "Room No", "Previous Status", "New Status");
-            System.out.println(divider);
-
-            int index = 1;
-            while (redoIt.hasNext()) {
-                HousekeepingTask t = redoIt.hasNext() ? redoIt.next() : null;
+            String[][] redoCells = new String[control.getRedoCount()][];
+            int index = 0;
+            while (redoIt.hasNext() && index < redoCells.length) {
+                HousekeepingTask t = redoIt.next();
                 if (t != null) {
-                    System.out.printf("| %-3d | %-8s | %-21s | %-21s |%n",
-                            index,
-                            t.getRoom().getRoomNo(),
-                            t.getPreviousStatus(),
-                            t.getNewStatus());
+                    redoCells[index] = new String[]{
+                        String.valueOf(index + 1),
+                        t.getRoom().getRoomNo(),
+                        t.getPreviousStatus(),
+                        t.getNewStatus()
+                    };
                     index++;
                 }
             }
-            System.out.println(divider);
+            String[] redoTable = TableRenderer.renderBordered(LOG_HEADERS, redoCells, null);
+            for (int i = 0; i < redoTable.length; i++) {
+                System.out.println(redoTable[i]);
+            }
         }
         System.out.println();
     }
@@ -312,17 +326,18 @@ public class HousekeepingUI {
 
         Room[] filtered = control.getFilteredSortedRooms(statusFilter, typeFilter, sortChoice);
 
-        String divider = "+---------+----------+------------------+------------------------+";
-        System.out.println("\n" + divider);
-        System.out.printf("| %-7s | %-8s | %-16s | %-22s |%n", "Room No", "Type", "Occupancy", "Housekeeping Status");
-        System.out.println(divider);
-
         int readyCount = 0;
         int pendingCount = 0;
+        String[] headers = {"Room No", "Type", "Occupancy", "Housekeeping Status"};
+        String[][] cells = new String[filtered.length][];
         for (int i = 0; i < filtered.length; i++) {
             Room r = filtered[i];
-            System.out.printf("| %-7s | %-8s | %-16s | %-22s |%n",
-                    r.getRoomNo(), r.getRoomType(), r.getOccupancyStatus(), r.getHousekeepingStatus());
+            cells[i] = new String[]{
+                r.getRoomNo(),
+                String.valueOf(r.getRoomType()),
+                r.getOccupancyStatus(),
+                r.getHousekeepingStatus()
+            };
 
             if ("Ready for Check-In".equalsIgnoreCase(r.getHousekeepingStatus())) {
                 readyCount++;
@@ -330,7 +345,12 @@ public class HousekeepingUI {
                 pendingCount++;
             }
         }
-        System.out.println(divider);
+
+        String[] table = TableRenderer.renderBordered(headers, cells, null);
+        System.out.println();
+        for (int i = 0; i < table.length; i++) {
+            System.out.println(table[i]);
+        }
 
         int totalFiltered = filtered.length;
         double readyPct = (totalFiltered > 0) ? ((double) readyCount / totalFiltered) * 100.0 : 0.0;
@@ -367,18 +387,21 @@ public class HousekeepingUI {
 
         HousekeepingTask[] tasks = control.getFilteredSortedTasks(zoneFilter, sortChoice);
 
-        System.out.println("\n------------------------------------------------------------------");
-        System.out.printf("%-6s | %-60s%n", "No.", "Action Event Details");
-        System.out.println("------------------------------------------------------------------");
-
+        String[] logHeaders = {"No.", "Action Event Details"};
         if (tasks.length == 0) {
+            System.out.println();
             System.out.println("No matching housekeeping task log entries found.");
         } else {
+            String[][] logCells = new String[tasks.length][];
             for (int i = 0; i < tasks.length; i++) {
-                System.out.printf("%-6d | %-60s%n", (i + 1), tasks[i]);
+                logCells[i] = new String[]{String.valueOf(i + 1), String.valueOf(tasks[i])};
+            }
+            String[] logTable = TableRenderer.renderBordered(logHeaders, logCells, null);
+            System.out.println();
+            for (int i = 0; i < logTable.length; i++) {
+                System.out.println(logTable[i]);
             }
         }
-        System.out.println("------------------------------------------------------------------");
 
         System.out.println("\n--- Audit Analytics & Metrics ---");
         System.out.println("Total Filtered Task Events: " + tasks.length);
