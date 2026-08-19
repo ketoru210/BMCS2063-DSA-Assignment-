@@ -176,6 +176,76 @@ public class MaxHeap<T extends Comparable<T>> implements CollectionInterface<T> 
         }
     }
 
+    // --- add-ons beyond the team interface ---
+
+    /**
+     * The entries in level order, which for this representation is the backing
+     * array itself. A copy is handed out so that a caller cannot reach in and
+     * break the heap property.
+     * <p>
+     * The element type is {@code Object} rather than {@code T}: the store is
+     * really a {@code Comparable[]}, so returning it as {@code T[]} would throw
+     * the moment the caller assigned it to an array of the concrete type.
+     */
+    public Object[] toLevelOrderArray() {
+        Object[] slots = new Object[size];
+        for (int i = 0; i < size; i++) {
+            slots[i] = heap[i];
+        }
+        return slots;
+    }
+
+    /**
+     * The number of levels the entries span. Level h holds 2^h nodes and the
+     * tree is complete by construction, so the answer follows from the size
+     * alone - one step per level, where a linked tree has to visit every node.
+     */
+    public int getHeight() {
+        int height = 0;
+        int covered = 0;
+        while (covered < size) {
+            covered += 1 << height;
+            height++;
+        }
+        return height;
+    }
+
+    /**
+     * Adds every entry of another collection, restoring the heap property once
+     * over the whole array instead of once per entry.
+     * <p>
+     * Repeated {@code add} costs n sift-ups of up to log n steps each. Appending
+     * first and then sifting down from the last parent backwards is O(n)
+     * instead: half the nodes are leaves and cannot move, a quarter move at most
+     * one level, an eighth at most two, and that weighted sum converges to a
+     * constant multiple of n rather than growing with log n.
+     * <p>
+     * Only the shape of the array matters to the rebuild, never the order it
+     * arrived in, so the source may be any implementation of the team ADT and
+     * its own policy is simply discarded.
+     */
+    public boolean addAll(CollectionInterface<T> other) {
+        if (other == null || other.isEmpty()) {
+            return false;
+        }
+        ensureCapacity(size + other.size());
+
+        Iterator<T> walker = other.getIterator();
+        while (walker.hasNext()) {
+            T entry = walker.next();
+            if (entry != null) {
+                heap[size] = entry;
+                size++;
+            }
+        }
+
+        // the last parent sits at size/2 - 1; every index after it is a leaf
+        for (int i = size / 2 - 1; i >= 0; i--) {
+            siftDown(i);
+        }
+        return true;
+    }
+
     // --- private helpers ---
 
     /**
@@ -246,12 +316,24 @@ public class MaxHeap<T extends Comparable<T>> implements CollectionInterface<T> 
     /**
      * Doubles the array when it is full.
      */
-    @SuppressWarnings({"unchecked"})
     private void ensureCapacity() {
-        if (size < heap.length) {
+        ensureCapacity(size + 1);
+    }
+
+    /**
+     * Grows to hold at least the given number of entries, doubling until it
+     * fits so that a bulk add still copies the old contents only once.
+     */
+    @SuppressWarnings({"unchecked"})
+    private void ensureCapacity(int required) {
+        if (required <= heap.length) {
             return;
         }
-        T[] bigger = (T[]) new Comparable[heap.length * 2];
+        int capacity = heap.length;
+        while (capacity < required) {
+            capacity *= 2;
+        }
+        T[] bigger = (T[]) new Comparable[capacity];
         System.arraycopy(heap, 0, bigger, 0, size);
         heap = bigger;
     }
