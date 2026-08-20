@@ -9,7 +9,7 @@ package entity;
  * GUEST is the bottom band, so a non-member is an ordinary Member whose tier
  * happens to be GUEST — one entity, and no module has to handle a null.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public enum LoyaltyTier {
     GUEST(0, "Guest"),

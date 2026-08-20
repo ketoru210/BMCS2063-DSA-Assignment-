@@ -10,7 +10,7 @@ import java.io.Serializable;
  * stored here — nothing in this class or in the heap ever reads a clock, so the
  * heap stays valid as time passes and never has to be rebuilt.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public class Allocation implements Serializable, Comparable<Allocation> {
     private static final long serialVersionUID = 1L;

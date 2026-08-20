@@ -4,6 +4,7 @@ import control.BookingControl;
 import control.BookingControl.SortKey;
 import entity.Booking;
 import entity.RoomType;
+import java.time.format.DateTimeFormatter;
 import utility.InputHelper;
 import utility.MenuItem;
 import utility.OutputHelper;
@@ -19,12 +20,13 @@ import utility.TreeRenderer;
  * parent sits between its own subtrees, and the width follows the number of
  * bookings instead of doubling with the height.
  *
- * @author QW
+ * @author Fong Qin Wen
  */
 public class FrontDeskUI {
 
     private static final String TITLE = "Front-Desk Service";
     private static final int TREE_GAP = 2;
+    private static final DateTimeFormatter STAY_DATE = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final BookingControl control;
 
@@ -38,6 +40,7 @@ public class FrontDeskUI {
         BACK("Back to Main Menu"),
         NEW_BOOKING("New Walk-in Booking"),
         LOOK_UP("Look Up Booking"),
+        LIST("View All Bookings"),
         CHECK_IN("Check-in Guest"),
         CHECK_OUT("Check-out Guest"),
         CANCEL("Cancel Booking"),
@@ -74,6 +77,9 @@ public class FrontDeskUI {
                     break;
                 case LOOK_UP:
                     lookUp();
+                    break;
+                case LIST:
+                    listAll();
                     break;
                 case CHECK_IN:
                     checkIn();
@@ -218,9 +224,7 @@ public class FrontDeskUI {
             if (found != null) {
                 OutputHelper.printOK("Found in " + control.getTreeHeight()
                         + " comparisons at most:");
-                System.out.println("  " + found);
-                System.out.println("  Charge: " + money(control.revenueOf(found))
-                        + " (" + found.getNights() + " nights)");
+                printBookings(null, new Booking[]{found});
             } else {
                 OutputHelper.printErr("No booking with confirmation no. " + confirmationNo);
                 Booking below = control.nearestBelow(confirmationNo);
@@ -228,16 +232,86 @@ public class FrontDeskUI {
                 if (below == null && above == null) {
                     System.out.println("  Nothing on file to compare against.");
                 } else {
-                    System.out.println("  Closest on file:");
+                    System.out.println("Closest on file:");
+                    int near = (below == null ? 0 : 1) + (above == null ? 0 : 1);
+                    String[] sides = new String[near];
+                    Booking[] rows = new Booking[near];
+                    int at = 0;
                     if (below != null) {
-                        System.out.println("    below > " + below);
+                        sides[at] = "below";
+                        rows[at++] = below;
                     }
                     if (above != null) {
-                        System.out.println("    above > " + above);
+                        sides[at] = "above";
+                        rows[at++] = above;
                     }
+                    printBookings(sides, rows);
                 }
             }
             InputHelper.waitForEnter();
+        }
+    }
+
+    /** Every booking on file, which the desk needs far more often than a report. */
+    private void listAll() {
+        Booking[] all = control.getAllBookings();
+        System.out.println();
+        if (all.length == 0) {
+            OutputHelper.printErr("No bookings on file.");
+            InputHelper.waitForEnter();
+            return;
+        }
+
+        // the order is not sorted here: an in-order walk of the tree already
+        // hands them over ascending by the key it is built on
+        OutputHelper.printBlue(all.length + " booking" + (all.length == 1 ? "" : "s")
+                + " on file, in the tree's in-order walk (ascending confirmation no.)");
+        System.out.println();
+        printBookings(null, all);
+        InputHelper.waitForEnter();
+    }
+
+    /**
+     * One row per booking under a shared set of headings. A non-null sides array
+     * adds a leading column, which is how the near-miss rows say which side of
+     * the missing key they sit on.
+     */
+    private void printBookings(String[] sides, Booking[] rows) {
+        boolean labelled = sides != null;
+        String[] headers = {"", "Conf No.", "Customer", "Type", "Room", "Stay",
+            "Nights", "Status", "Charge"};
+        Align[] aligns = {Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT,
+            Align.LEFT, Align.RIGHT, Align.LEFT, Align.RIGHT};
+        int skip = labelled ? 0 : 1;
+
+        String[][] cells = new String[rows.length][];
+        for (int i = 0; i < rows.length; i++) {
+            Booking booking = rows[i];
+            String[] row = {
+                labelled ? sides[i] : "",
+                booking.getConfirmationNo(),
+                booking.getMember().getName(),
+                String.valueOf(booking.getRoomType()),
+                booking.isAllocated() ? booking.getRoom().getRoomNo() : "-",
+                booking.getCheckIn().format(STAY_DATE)
+                        + " - " + booking.getCheckOut().format(STAY_DATE),
+                String.valueOf(booking.getNights()),
+                booking.getStatus(),
+                // a cancelled booking is still shown, but earns nothing
+                control.earnsRevenue(booking) ? money(control.revenueOf(booking)) : "-"
+            };
+            cells[i] = new String[row.length - skip];
+            System.arraycopy(row, skip, cells[i], 0, cells[i].length);
+        }
+
+        String[] used = new String[headers.length - skip];
+        Align[] usedAligns = new Align[aligns.length - skip];
+        System.arraycopy(headers, skip, used, 0, used.length);
+        System.arraycopy(aligns, skip, usedAligns, 0, usedAligns.length);
+
+        String[] table = TableRenderer.renderBordered(used, cells, usedAligns);
+        for (int i = 0; i < table.length; i++) {
+            System.out.println(table[i]);
         }
     }
 
@@ -311,7 +385,8 @@ public class FrontDeskUI {
                 continue;
             }
 
-            System.out.println("\n  " + found);
+            System.out.println();
+            printBookings(null, new Booking[]{found});
             String answer = InputHelper.readLine("Cancel this booking? [y/N] > ");
             if (!answer.equalsIgnoreCase("y")) {
                 notice = "Cancellation aborted.";

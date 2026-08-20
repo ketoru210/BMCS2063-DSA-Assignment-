@@ -19,7 +19,7 @@ import java.util.NoSuchElementException;
  * {@code getIterator()} walks the array in level order, which is NOT sorted
  * order — the heap property only orders a parent against its own descendants.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public class MaxHeap<T extends Comparable<T>> implements CollectionInterface<T> {
     private static final int DEFAULT_CAPACITY = 20;

@@ -18,7 +18,7 @@ import java.util.Iterator;
  * reason — a tree would hand the numbers over in ascending order and the tree
  * built from them would be the right spine the scattering was meant to avoid.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public class BookingDAO {
     // static so every control seeded from here shares one set of objects

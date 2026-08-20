@@ -14,7 +14,7 @@ import java.util.Iterator;
 /**
  * Boundary CLI for Module 3 — Housekeeping and Task Log.
  *
- * @author Pujin
+ * @author Wong Pu Jin
  */
 public class HousekeepingUI {
 

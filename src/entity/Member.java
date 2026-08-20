@@ -5,7 +5,7 @@ import adt.CollectionInterface;
 import adt.DoublyLinkedList;
 
 /**
- * @author Kang Yong
+ * @author Lai Kang Yong
  */
 
 public class Member implements Serializable, Comparable<Member> {

@@ -9,7 +9,7 @@ import java.util.NoSuchElementException;
  * <p>
  * Empty-collection operations return {@code null} and never throw.
  *
- * @author QW
+ * @author Fong Qin Wen
  */
 public class BinarySearchTree<T extends Comparable<T>> implements CollectionInterface<T> {
 

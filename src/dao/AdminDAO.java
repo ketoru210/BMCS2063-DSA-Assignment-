@@ -5,6 +5,9 @@ import adt.DoublyLinkedList;
 import entity.Admin;
 import java.util.Iterator;
 
+/**
+ * @author Lai Kang Yong
+ */
 public class AdminDAO {
     private static final CollectionInterface<Admin> ADMINS = seed();
 

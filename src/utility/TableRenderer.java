@@ -7,7 +7,7 @@ package utility;
  * <p>Rows come back as strings rather than being printed, so the caller can
  * colour individual rows.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public final class TableRenderer {
 

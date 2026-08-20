@@ -24,7 +24,7 @@ import entity.SpecialCategory;
  * control re-keys every entry and rebuilds the heap from the shape alone, so
  * whatever order this one happens to be in is discarded.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public class AllocationDAO {
     /** The simulated "now" the seed was aged against. */

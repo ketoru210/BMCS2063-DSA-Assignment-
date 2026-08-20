@@ -9,7 +9,7 @@ import entity.RoomType;
  * DAO for Room entity master registry.
  * Hardcodes initial seeded rooms into team ADT DoublyLinkedList.
  *
- * @author Pujin
+ * @author Wong Pu Jin
  */
 public class RoomDAO {
     // M2 hands out a room only when occupancy is Available AND housekeeping is

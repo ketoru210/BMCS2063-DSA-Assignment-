@@ -2,6 +2,9 @@ package entity;
 
 import java.io.Serializable;
 
+/**
+ * @author Lai Kang Yong
+ */
 public class Admin implements Serializable, Comparable<Admin> {
     private String adminID;
     private String username;

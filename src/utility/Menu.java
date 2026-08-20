@@ -10,6 +10,8 @@ package utility;
  * <p>Clearing the screen is the caller's job. Screens that print their own
  * content above the menu must not be wiped, and only the caller knows which
  * kind it is, so callers invoke {@link OutputHelper#clearScreen()} themselves.
+ *
+ * @author Lam Yong Zhe
  */
 public final class Menu {
 

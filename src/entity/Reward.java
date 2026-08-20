@@ -2,6 +2,9 @@ package entity;
 
 import java.io.Serializable;
 
+/**
+ * @author Lai Kang Yong
+ */
 public class Reward implements Serializable, Comparable<Reward>{
     private String rewardID;
     private String rewardName;

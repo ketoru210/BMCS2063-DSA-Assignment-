@@ -36,7 +36,7 @@ import java.util.Iterator;
  * <p>
  * DAO provides data. Control performs operations.
  *
- * @author Kang Yong
+ * @author Lai Kang Yong
  */
 public class LoyaltyControl {
     private final DoublyLinkedList<Member> memberDoublyLinkedList;

@@ -8,7 +8,7 @@ package entity;
  * Constants are declared in ascending order of that interest, with gaps of 10
  * so a new category can be inserted without renumbering the rest.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public enum SpecialCategory {
     NONE(0, "-"),

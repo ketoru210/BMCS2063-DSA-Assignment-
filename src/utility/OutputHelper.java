@@ -3,6 +3,9 @@ package utility;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
+/**
+ * @author Lam Yong Zhe
+ */
 public class OutputHelper {
     private static final String resetANSI = "\033[0m" ;
     private static final String redANSI   = "\033[31m";

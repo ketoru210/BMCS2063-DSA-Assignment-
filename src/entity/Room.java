@@ -3,7 +3,7 @@ package entity;
 import java.io.Serializable;
 
 /**
- * @author Pujin
+ * @author Wong Pu Jin
  */
 public class Room implements Serializable, Comparable<Room> {
     private String roomNo;

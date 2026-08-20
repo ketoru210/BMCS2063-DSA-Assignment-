@@ -5,6 +5,9 @@ import adt.DoublyLinkedList;
 import entity.Reward;
 import java.util.Iterator;
 
+/**
+ * @author Lai Kang Yong
+ */
 public class RewardDAO {
     // Reward IDs come from a static counter, so the seeding order fixes them
     private static final CollectionInterface<Reward> REWARDS = seed();

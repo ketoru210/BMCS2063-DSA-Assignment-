@@ -11,6 +11,9 @@ import utility.Menu;
 import utility.MenuItem;
 import utility.OutputHelper;
 
+/**
+ * @author Lam Yong Zhe
+ */
 public class Main {
     private static final String TITLE = "TARUMT Resorts";
     private static final String BANNER = "(^_^)/ Welcome!";

@@ -10,7 +10,7 @@ import java.util.NoSuchElementException;
  * returned by {@code remove()} and {@code getFirst()} is the top of the stack.
  *
  * @param <T> the type of elements held in this stack
- * @author Pujin
+ * @author Wong Pu Jin
  */
 public class LinkedStack<T extends Comparable<T>> implements CollectionInterface<T> {
 

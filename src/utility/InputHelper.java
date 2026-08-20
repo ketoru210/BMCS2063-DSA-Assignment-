@@ -5,6 +5,8 @@ import java.util.Scanner;
 /**
  * Small utility class for reading and validating console input.
  * Utility classes contain only static members.
+ *
+ * @author Lam Yong Zhe
  */
 public final class InputHelper {
 

@@ -33,7 +33,7 @@ import utility.TreeRenderer;
  * This screen builds its own menu instead of calling {@code Menu.prompt} so that
  * individual lines of the view can be colored; the layout convention is the same.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public class AllocationUI {
 

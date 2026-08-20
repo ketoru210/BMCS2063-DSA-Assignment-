@@ -18,14 +18,14 @@ import entity.Tier;
  * from a static counter, so the value depends on construction order and is not
  * safe to hard-code here.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  * Seed data source for the Loyalty and Rewards Service.
  *
  * <p>MemberDAO provides the initial members and their member-specific records.
  * The DAO only provides data. LoyaltyControl is responsible for loading these
  * arrays into each Member's corresponding ADTs.</p>
  *
- * @author Kang Yong
+ * @author Lai Kang Yong
  */
 
 public class MemberDAO {

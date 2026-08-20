@@ -2,6 +2,9 @@ package entity;
 
 import java.io.Serializable;
 
+/**
+ * @author Lai Kang Yong
+ */
 public class TierRequirement implements Serializable, Comparable<TierRequirement> {
     private LoyaltyTier loyaltyTier;
     private int pointsToDowngradeTier;

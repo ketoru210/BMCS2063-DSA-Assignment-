@@ -26,7 +26,7 @@ import java.util.Iterator;
  * a DAO: a DAO is private to its own module, and going through the control is
  * what keeps every module pointing at one set of objects.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public class AllocationControl {
     // only Confirmed bookings queue for a room; move to utility/ when M4 needs it too

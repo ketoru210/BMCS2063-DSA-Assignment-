@@ -9,7 +9,7 @@ import java.util.NoSuchElementException;
  * Organizing policy: <b>head first</b>. {@code add} appends at the tail, so the
  * traversal order given by {@code getIterator()} is insertion order.
  *
- * @author Kang Yong
+ * @author Lai Kang Yong
  */
 public class DoublyLinkedList<T extends Comparable<T>> implements CollectionInterface<T>{
     private Node firstNode;

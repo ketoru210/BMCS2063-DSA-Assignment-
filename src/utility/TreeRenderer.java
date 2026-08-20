@@ -11,7 +11,7 @@ package utility;
  * <p>Width grows as {@code 2^layers}, so a tree deep enough to overflow the
  * console has to be handed over one layer-capped slice at a time.
  *
- * @author YZ
+ * @author Lam Yong Zhe
  */
 public final class TreeRenderer {
 

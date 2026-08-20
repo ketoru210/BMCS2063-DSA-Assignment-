@@ -3,7 +3,7 @@ package entity;
 import java.io.Serializable;
 
 /**
- * @author Kang Yong
+ * @author Lai Kang Yong
  */
 
 public class Notification implements Serializable, Comparable<Notification> {

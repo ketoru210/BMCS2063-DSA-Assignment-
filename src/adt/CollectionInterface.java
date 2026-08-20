@@ -13,7 +13,10 @@ import java.util.Iterator;
  * Empty-collection convention: {@code remove()}, {@code getFirst()},
  * {@code getLast()} and {@code search()} return {@code null}; they never throw.
  *
- * @author all member
+ * @author Lam Yong Zhe
+ * @author Fong Qin Wen
+ * @author Lai Kang Yong
+ * @author Wong Pu Jin
  */
 public interface CollectionInterface<T extends Comparable<T>> {
 

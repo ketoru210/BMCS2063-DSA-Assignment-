@@ -6,6 +6,9 @@ import entity.LoyaltyTier;
 import entity.TierRequirement;
 import java.util.Iterator;
 
+/**
+ * @author Lai Kang Yong
+ */
 public class TierRequirementDAO {
     private static final CollectionInterface<TierRequirement> TIER_REQUIREMENTS = seed();
 

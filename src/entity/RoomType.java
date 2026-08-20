@@ -1,13 +1,11 @@
 package entity;
 
 /**
- * PLACEHOLDER — field contract per plan.md, replace with the owner's version.
- * <p>
  * Rates are deliberately not evenly spaced: with an even spread the revenue
  * ranking would always equal the occupancy ranking times a constant, and M6's
  * report would have nothing to compute.
  *
- * @author YZ (placeholder)
+ * @author Lam Yong Zhe
  */
 public enum RoomType {
     SINGLE(200.00, "Single"),

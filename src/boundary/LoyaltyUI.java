@@ -18,6 +18,9 @@ import utility.OutputHelper;
 import utility.TableRenderer;
 import utility.TableRenderer.Align;
 
+/**
+ * @author Lai Kang Yong
+ */
 public class LoyaltyUI {
     private static final String TITLE = "Loyalty and Rewards Service";
     private final LoyaltyControl control;

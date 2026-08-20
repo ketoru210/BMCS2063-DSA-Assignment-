@@ -1,7 +1,7 @@
 package entity;
 
 /**
- * @author Kang Yong
+ * @author Lai Kang Yong
  */
 public enum NotificationType {
     ANNOUNCEMENT("Announcement"),

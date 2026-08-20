@@ -26,7 +26,7 @@ import java.util.Random;
  * changes state has to reach the other modules holding it: M2's queue when it is
  * cancelled, M3's task log when the guest leaves.
  *
- * @author QW
+ * @author Fong Qin Wen
  */
 public class BookingControl {
 
@@ -465,15 +465,3 @@ public class BookingControl {
             return shape;
         }
     }
-    // public Booking findByConfirmationNo(String confirmationNo) {
-    //     if (confirmationNo == null) {
-    //         return null;
-    //     }
-    //     for (int i = 0; i < bookings.length; i++) {
-    //         if (bookings[i].getConfirmationNo().equals(confirmationNo)) {
-    //             return bookings[i];
-    //         }
-    //     }
-    //     return null;
-    // }
-    //}

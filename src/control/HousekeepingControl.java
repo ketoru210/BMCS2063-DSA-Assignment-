@@ -15,7 +15,7 @@ import java.util.Iterator;
  * using an undo/redo stack pair backed by the team's {@code LinkedStack} ADT.
  * Supports state machine validation and custom report filtering/sorting.
  *
- * @author Pujin
+ * @author Wong Pu Jin
  */
 public class HousekeepingControl {
 

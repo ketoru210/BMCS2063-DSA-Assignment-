@@ -5,7 +5,7 @@ import java.io.Serializable;
 /**
  * Entity representing a single housekeeping task operation in Module 3.
  *
- * @author Pujin
+ * @author Wong Pu Jin
  */
 public class HousekeepingTask implements Comparable<HousekeepingTask>, Serializable {
 

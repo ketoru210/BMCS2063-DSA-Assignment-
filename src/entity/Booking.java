@@ -6,14 +6,11 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 
 /**
- * PLACEHOLDER — field contract per plan.md, replace with the owner's version but
- * keep these getter names so dao/ and M2's control keep compiling.
- * <p>
  * {@code compareTo} orders by confirmation number because M4's BST keys on it —
  * that is fixed, and it is why the allocation queue needs its own entry type
  * rather than heaping Bookings directly.
  *
- * @author YZ (placeholder)
+ * @author Fong Qin Wen
  */
 public class Booking implements Serializable, Comparable<Booking> {
     private static final long serialVersionUID = 1L;
