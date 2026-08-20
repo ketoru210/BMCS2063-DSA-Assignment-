@@ -148,15 +148,6 @@ public class LoyaltyControl {
         if (!password.equals(admin.getPassword())) return null;
         return admin;
     }
-    public Tier getLatestTierRecord(Member member) {
-        if (member == null || member.getTierRecords().isEmpty()) return null;
-        return member.getTierRecords().getLast();
-    }
-    public boolean adjustMemberPoints(Member member, int points) {
-        if (member == null || points < 0) return false;
-        member.setCurrentPoints(points);
-        return true;
-    }
     public boolean updateMember(Member member, String name, String password, LoyaltyTier tier, Integer points) {
         if (member == null) return false;
         if (name != null && !name.isBlank()) member.setName(name);
@@ -187,12 +178,6 @@ public class LoyaltyControl {
     public boolean removeTierRecord(Member member, Tier tier) {
         if (member == null || tier == null) return false;
         return member.getTierRecords().remove(tier);
-    }
-    public boolean changeMemberTier(Member member, LoyaltyTier newTier) {
-        if (member == null || newTier == null) return false;
-        if (member.getCurrentTier() == newTier) return false;
-        member.setCurrentTier(newTier);
-        return true;
     }
     public void endSeason() {
         String seasonLabel = getSeasonSummary();
@@ -280,25 +265,6 @@ public class LoyaltyControl {
         }
         return temp;
     }
-    public Promotion findPromotionByID(Member member, int id) {
-        if (member == null) return null;
-        String promotionID = String.format("P%05d", id);
-        Iterator<Promotion> iterator = member.getPromotionRecords().getIterator();
-        while (iterator.hasNext()) {
-            Promotion promotion = iterator.next();
-            if (promotion.getPromotionID().equals(promotionID)) return promotion;
-        }
-        return null;
-    }
-    public Promotion findPromotionByLabel(Member member, String label) {
-        if (member == null || label == null) return null;
-        Iterator<Promotion> iterator = member.getPromotionRecords().getIterator();
-        while (iterator.hasNext()) {
-            Promotion promotion = iterator.next();
-            if (promotion.getLabel().equalsIgnoreCase(label)) return promotion;
-        }
-        return null;
-    }
     public void assignPromotion(Member member, Promotion promotion) {
         if (member == null || promotion == null) return;
         if (member.getPromotionRecords().contains(promotion)) return;
@@ -321,16 +287,6 @@ public class LoyaltyControl {
             result[index++] = iterator.next();
         }
         return result;
-    }
-    public Notification findNotificationByID(Member member, int id) {
-        if (member == null) return null;
-        String notificationID = String.format("N%05d", id);
-        Iterator<Notification> iterator = member.getNotificationRecords().getIterator();
-        while (iterator.hasNext()) {
-            Notification notification = iterator.next();
-            if (notification.getNotificationID().equals(notificationID)) return notification;
-        }
-        return null;
     }
     public int countUnreadNotifications(Member member) {
         if (member == null) return 0;
@@ -368,13 +324,6 @@ public class LoyaltyControl {
         String rewardID = String.format("RW%05d", id);
         for (Reward reward : rewards) {
             if (reward.getRewardID().equals(rewardID)) return reward;
-        }
-        return null;
-    }
-    public Reward findRewardByName(String name) {
-        if (name == null) return null;
-        for (Reward reward : rewards) {
-            if (reward.getRewardName().equalsIgnoreCase(name)) return reward;
         }
         return null;
     }
