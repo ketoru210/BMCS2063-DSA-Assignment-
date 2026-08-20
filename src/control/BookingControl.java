@@ -313,6 +313,85 @@ public class BookingControl {
             return found;
         }
 
+        /** Which column an audit is ordered on. */
+        public enum SortKey {
+            CONFIRMATION_NO("Confirmation no."),
+            CUSTOMER_NAME("Customer name"),
+            NIGHTS("Nights"),
+            CHARGE("Charge"),
+            STATUS("Status");
+
+            private final String label;
+
+            SortKey(String label){
+                this.label = label;
+            }
+
+            @Override
+            public String toString(){
+                return label;
+            }
+        }
+
+        /**
+         * Sorts a copy of the audited batch, leaving the caller's array alone.
+         * <p>
+         * Insertion sort rather than something with a better worst case: the batch
+         * comes straight off the tree's in-order walk, so it arrives already sorted
+         * on confirmation no. and near-sorted on anything that tracks it. Insertion
+         * sort walks an ordered run at one comparison per entry and only pays for
+         * the entries actually out of place, where a divide-and-conquer sort would
+         * split and merge the whole range regardless.
+         * <p>
+         * Shifting rather than swapping: the entry being placed is held aside and
+         * the bigger ones slide up, so a move of k places costs k assignments and
+         * not 3k.
+         */
+        public Booking[] sortBy(Booking[] source, SortKey key, boolean descending){
+            Booking[] sorted = new Booking[source.length];
+            for(int i = 0; i < source.length; i++){
+                sorted[i] = source[i];
+            }
+
+            for(int i = 1; i < sorted.length; i++){
+                Booking moving = sorted[i];
+                int j = i - 1;
+                // strict, so equal entries never shift: that is what keeps it stable
+                while(j >= 0 && outOfOrder(sorted[j], moving, key, descending)){
+                    sorted[j + 1] = sorted[j];
+                    j--;
+                }
+                sorted[j + 1] = moving;
+            }
+            return sorted;
+        }
+
+        /** True when settled sits on the wrong side of moving and has to slide up. */
+        private boolean outOfOrder(Booking settled, Booking moving, SortKey key, boolean descending){
+            int order = compare(settled, moving, key);
+            return descending ? order < 0 : order > 0;
+        }
+
+        private int compare(Booking left, Booking right, SortKey key){
+            switch(key){
+                case CUSTOMER_NAME:
+                    return left.getMember().getName().compareToIgnoreCase(right.getMember().getName());
+                case NIGHTS:
+                    return Long.compare(left.getNights(), right.getNights());
+                case CHARGE:
+                    return Double.compare(chargeOf(left), chargeOf(right));
+                case STATUS:
+                    return left.getStatus().compareToIgnoreCase(right.getStatus());
+                default:
+                    return left.getConfirmationNo().compareTo(right.getConfirmationNo());
+            }
+        }
+
+        /** A cancelled booking is charged nothing, so it sorts as nothing. */
+        private double chargeOf(Booking booking){
+            return earnsRevenue(booking) ? revenueOf(booking) : 0.0;
+        }
+
         public double revenueOf(Booking booking){
             return booking.getRoomType().getRatePerNight() * booking.getNights();
         }

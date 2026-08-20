@@ -1,6 +1,7 @@
 package boundary;
 
 import control.BookingControl;
+import control.BookingControl.SortKey;
 import entity.Booking;
 import entity.RoomType;
 import utility.InputHelper;
@@ -302,7 +303,7 @@ public class FrontDeskUI {
 
     private void treeHealthReport() {
         OutputHelper.clearScreen();
-        OutputHelper.printTitle("Tree Health Report");
+        OutputHelper.printReportHeader("Tree Health Report", "every booking on file");
         System.out.println();
 
         int size = control.size();
@@ -335,6 +336,11 @@ public class FrontDeskUI {
         } else {
             OutputHelper.printErr("  Close to a linked list. Lookups are degrading towards O(n).");
         }
+
+        System.out.println();
+        OutputHelper.printReportFooter(String.format(
+                "Records : %d    Height : %d of %d optimal    Degeneracy : %.1f%%",
+                size, height, optimal, degeneracy));
         InputHelper.waitForEnter();
     }
 
@@ -346,12 +352,25 @@ public class FrontDeskUI {
         String high = InputHelper.readLine("To confirmation no.   > ");
 
         Booking[] batch = control.findInRange(low, high);
-        System.out.println();
         if (batch.length == 0) {
+            System.out.println();
             OutputHelper.printErr("No bookings in that range.");
             InputHelper.waitForEnter();
             return;
         }
+
+        SortKey key = askSortKey();
+        if (key == null) {
+            return;
+        }
+        boolean descending = askDescending(key);
+        batch = control.sortBy(batch, key, descending);
+
+        System.out.println();
+        OutputHelper.printReportHeader("Confirmation Range Audit",
+                "confirmation no. " + low + " to " + high
+                        + ", ordered by " + key + (descending ? " (high to low)" : " (low to high)"));
+        System.out.println();
 
         String[] headers = {"CONF NO", "NAME", "TYPE", "NIGHTS", "STATUS", "CHARGE"};
         Align[] aligns = {Align.LEFT, Align.LEFT, Align.LEFT, Align.RIGHT, Align.LEFT, Align.RIGHT};
@@ -402,7 +421,46 @@ public class FrontDeskUI {
         for (int i = 1; i < shareRows.length; i++) {
             System.out.println("    " + shareRows[i]);
         }
+
+        System.out.println();
+        OutputHelper.printReportFooter(String.format(
+                "Records : %d of %d on file    Total charge : %s    Average : %s",
+                batch.length, control.size(), money(total),
+                money(earning == 0 ? 0.0 : total / earning)));
         InputHelper.waitForEnter();
+    }
+
+    /** Null means the user backed out. */
+    private SortKey askSortKey() {
+        SortKey[] keys = SortKey.values();
+        System.out.println("\nOrder the audit by:");
+        System.out.println("[0] Back");
+        for (int i = 0; i < keys.length; i++) {
+            System.out.printf("[%d] %s%n", i + 1, keys[i]);
+        }
+        for (;;) {
+            int pick = InputHelper.readInt("\nPlease Select > ");
+            if (pick == 0) {
+                return null;
+            }
+            if (pick >= 1 && pick <= keys.length) {
+                return keys[pick - 1];
+            }
+            OutputHelper.printErr("Please enter a number between 0 and " + keys.length + ".");
+        }
+    }
+
+    private boolean askDescending(SortKey key) {
+        System.out.println("\n" + key + " order:");
+        System.out.println("[1] Low to high");
+        System.out.println("[2] High to low");
+        for (;;) {
+            int pick = InputHelper.readInt("\nPlease Select > ");
+            if (pick == 1 || pick == 2) {
+                return pick == 2;
+            }
+            OutputHelper.printErr("Please enter 1 or 2.");
+        }
     }
 
     private String bar(double percent) {
