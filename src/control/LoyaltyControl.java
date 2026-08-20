@@ -162,11 +162,9 @@ public class LoyaltyControl {
         if (name != null && !name.isBlank()) member.setName(name);
         if (password != null && !password.isBlank()) member.setPassword(password);
         if (tier != null) member.setCurrentTier(tier);
-        if (points != null && points >= 0) {
-            member.setCurrentPoints(points);
-        } else {
-            return points == null;
-        }
+        if (points == null || points == -1) return true;
+        if (points < 0) return false;
+        member.setCurrentPoints(points);
         return true;
     }
     public TierRequirement findTierRequirement(LoyaltyTier tier) {
@@ -447,6 +445,90 @@ public class LoyaltyControl {
     public void postPromotionNotification(Member member, Promotion promotion) {
         if (member == null || promotion == null) return;
         addNotification(member, promotion.getLabel(), promotion.getDescription(), NotificationType.PROMOTION);
+    }
+    public Member[] getTierPerformanceReport(LoyaltyTier tier, int minSeasonalPoints) {
+        Member[] all = getAllMembers();
+        int count = 0;
+        for (Member m : all) {
+            if (m.getCurrentTier() == LoyaltyTier.GUEST) continue;
+            if (tier != null && m.getCurrentTier() != tier) continue;
+            if (m.getSeasonalPoints() < minSeasonalPoints) continue;
+            count++;
+        }
+        Member[] filtered = new Member[count];
+        int index = 0;
+        for (Member m : all) {
+            if (m.getCurrentTier() == LoyaltyTier.GUEST) continue;
+            if (tier != null && m.getCurrentTier() != tier) continue;
+            if (m.getSeasonalPoints() < minSeasonalPoints) continue;
+            filtered[index++] = m;
+        }
+        for (int i = 1; i < filtered.length; i++) {
+            Member key = filtered[i];
+            int j = i - 1;
+            while (j >= 0 && filtered[j].getSeasonalPoints() < key.getSeasonalPoints()) {
+                filtered[j + 1] = filtered[j];
+                j--;
+            }
+            filtered[j + 1] = key;
+        }
+        return filtered;
+    }
+    public int findMemberIndexByUsername(Member[] members, String username) {
+        if (username == null) return -1;
+        for (int i = 0; i < members.length; i++) {
+            if (members[i].getUsername().equalsIgnoreCase(username)) return i;
+        }
+        return -1;
+    }
+    public static final class RewardStat {
+        private final String label;
+        private int count;
+        private int totalPoints;
+        private RewardStat(String label) { this.label = label; }
+        public String getLabel() { return label; }
+        public int getCount() { return count; }
+        public int getTotalPoints() { return totalPoints; }
+    }
+    public RewardStat[] getRewardPopularityReport(String fromDate, String toDate, int minPoints, boolean sortByCount) {
+        LocalDate from = (fromDate == null || fromDate.isBlank()) ? null : LocalDate.parse(fromDate, DATE_FORMAT);
+        LocalDate to = (toDate == null || toDate.isBlank()) ? null : LocalDate.parse(toDate, DATE_FORMAT);
+        RewardStat[] stats = new RewardStat[0];
+        Member[] members = getAllMembers();
+        for (Member member : members) {
+            Iterator<Redemption> walker = member.getRedemptionRecords().getIterator();
+            while (walker.hasNext()) {
+                Redemption r = walker.next();
+                if (r.getPointsSpent() < minPoints) continue;
+                LocalDate date = LocalDate.parse(r.getRedemptionDate(), DATE_FORMAT);
+                if (from != null && date.isBefore(from)) continue;
+                if (to != null && date.isAfter(to)) continue;
+                RewardStat match = null;
+                for (RewardStat s : stats) {
+                    if (s.label.equalsIgnoreCase(r.getReward())) { match = s; break; }
+                }
+                if (match == null) {
+                    RewardStat[] grown = new RewardStat[stats.length + 1];
+                    System.arraycopy(stats, 0, grown, 0, stats.length);
+                    match = new RewardStat(r.getReward());
+                    grown[stats.length] = match;
+                    stats = grown;
+                }
+                match.count++;
+                match.totalPoints += r.getPointsSpent();
+            }
+        }
+        for (int i = 1; i < stats.length; i++) {
+            RewardStat key = stats[i];
+            int keyMetric = sortByCount ? key.count : key.totalPoints;
+            int j = i - 1;
+            while (j >= 0 && (sortByCount ? stats[j].count : stats[j].totalPoints) < keyMetric) {
+                stats[j + 1] = stats[j];
+                j--;
+            }
+            stats[j + 1] = key;
+        }
+        return stats;
     }
     public DoublyLinkedList<Tier>.Cursor getTierCursor(Member member, int startIndex) {
         DoublyLinkedList<Tier>.Cursor cursor = member.getTierCursor();

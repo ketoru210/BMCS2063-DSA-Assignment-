@@ -56,6 +56,7 @@ public class LoyaltyUI {
         MANAGE_TIERS("Manage Tier Requirements"),
         MANAGE_NOTIFICATIONS("Manage Notifications"),
         MANAGE_REDEMPTIONS("View Redemption Records"),
+        REPORTS("Reports"),
 
         MODIFY_PROMOTION("Modify Existing Promotions"),
         CREATE_PROMOTION("Create Promotion"),
@@ -66,7 +67,9 @@ public class LoyaltyUI {
         EDIT_TIER_REQUIREMENTS("Edit a Tier Requirements"),
         END_SEASON("End Current Season Now"),
         VIEW_MEMBER_NOTIFICATION("View Member Notification"),
-        ANNOUNCE("Make Announcement");
+        ANNOUNCE("Make Announcement"),
+        TIER_PERFORMANCE_REPORT("Member Tier & Points Performance"),
+        REWARD_POPULARITY_REPORT("Redemption & Reward Popularity");
         private final String label;
         MenuOption(String label) { this.label = label; }
         @Override
@@ -338,11 +341,10 @@ public class LoyaltyUI {
         }
     }
     private void print(String[] rows) {
-        for (int i = 0; i < rows.length; i++) {
-            System.out.println(rows[i]);
+        for (String row : rows) {
+            System.out.println(row);
         }
     }
-
     private void statusUI() {
         control.refreshMemberState(currentMember);
         for (;;) {
@@ -420,6 +422,7 @@ public class LoyaltyUI {
             MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
             if (selected == MenuOption.BACK) return;
             int choice = InputHelper.readInt("Select Tier Record > ");
+            if (choice == 0) return;
             if (choice < 1 || choice > records.length) {
                 OutputHelper.printErr("Please enter number between 1 and " + records.length + ".");
                 InputHelper.waitForEnter();
@@ -429,8 +432,18 @@ public class LoyaltyUI {
             return;
         }
     }
+    private <T extends Comparable<T>> T stepToPrevious(DoublyLinkedList<T>.Cursor cursor) {
+        cursor.previous();
+        if (cursor.hasPrevious()) {
+            T value = cursor.previous();
+            cursor.next();
+            return value;
+        }
+        cursor.next();
+        return null;
+    }
     private void displayTierDetails(DoublyLinkedList<Tier>.Cursor cursor) {
-        Tier tier = cursor.next(); // land on the selected node; cursor now sits just after it
+        Tier tier = cursor.next();
         for (;;) {
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Tier Record Details");
@@ -442,12 +455,10 @@ public class LoyaltyUI {
                 case BACK:
                     return;
                 case PREVIOUS:
-                    cursor.previous(); // step back onto current node
-                    if (cursor.hasPrevious()) {
-                        tier = cursor.previous();
-                        cursor.next();
+                    Tier prevTier = stepToPrevious(cursor);
+                    if (prevTier != null) {
+                        tier = prevTier;
                     } else {
-                        cursor.next();
                         OutputHelper.printErr("This is the first tier record.");
                         InputHelper.waitForEnter();
                     }
@@ -594,6 +605,7 @@ public class LoyaltyUI {
             MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
             if (selected == MenuOption.BACK) return;
             int choice = InputHelper.readInt("Select Redemption > ");
+            if (choice == 0) return;
             if (choice < 1 || choice > redemptions.length) {
                 OutputHelper.printErr("Please enter number between 1 and " + redemptions.length + ".");
                 InputHelper.waitForEnter();
@@ -621,10 +633,9 @@ public class LoyaltyUI {
                 case BACK:
                     return;
                 case PREVIOUS:
-                    cursor.previous(); // step back onto current node
-                    if (cursor.hasPrevious()) {
-                        redemption = cursor.previous();
-                        cursor.next();
+                    Redemption prevRedemption = stepToPrevious(cursor);
+                    if (prevRedemption != null) {
+                        redemption = prevRedemption;
                     } else {
                         OutputHelper.printErr("This is the first redemption record.");
                         InputHelper.waitForEnter();
@@ -685,13 +696,48 @@ public class LoyaltyUI {
             MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
             if (selected == MenuOption.BACK) return;
             int choice = InputHelper.readInt("Select Promotion > ");
+            if (choice == 0) return;
             if (choice < 1 || choice > promotions.length) {
                 OutputHelper.printErr("Please enter number between 1 and " + promotions.length + ".");
                 InputHelper.waitForEnter();
                 continue;
             }
-            displayPromotionDetails(control.getPromotionCursor(currentMember, choice - 1));
+            if (currentMember == null) {
+                displayGuestPromotionDetails(promotions, choice - 1);
+            } else {
+                displayPromotionDetails(control.getPromotionCursor(currentMember, choice - 1));
+            }
             return;
+        }
+    }
+    private void displayGuestPromotionDetails(Promotion[] promotions, int index) {
+        for (;;) {
+            OutputHelper.clearScreen();
+            OutputHelper.printTitle("Promotion Details");
+            System.out.println();
+            printPromotion(promotions[index]);
+            MenuOption[] detailOptions = { MenuOption.BACK, MenuOption.PREVIOUS, MenuOption.NEXT };
+            MenuOption selected = Menu.prompt(TITLE, "Promotion Details", detailOptions);
+            switch (selected) {
+                case BACK: return;
+                case PREVIOUS:
+                    if (index > 0) {
+                        index--;
+                    } else {
+                        OutputHelper.printErr("This is the first promotion.");
+                        InputHelper.waitForEnter();
+                    }
+                    break;
+                case NEXT:
+                    if (index < promotions.length - 1) {
+                        index++;
+                    } else {
+                        OutputHelper.printErr("This is the last promotion.");
+                        InputHelper.waitForEnter();
+                    }
+                    break;
+                default: break;
+            }
         }
     }
     private void displayPromotionDetails(DoublyLinkedList<Promotion>.Cursor cursor) {
@@ -701,28 +747,20 @@ public class LoyaltyUI {
             OutputHelper.printTitle("Promotion Details");
             System.out.println();
             printPromotion(promotion);
-            MenuOption[] detailOptions;
-            if (currentMember == null) {
-                detailOptions = new MenuOption[]{
-                        MenuOption.BACK,
-                        MenuOption.PREVIOUS,
-                        MenuOption.NEXT
-                };
-            } else {
-                detailOptions = new MenuOption[]{
-                        MenuOption.BACK,
-                        MenuOption.PREVIOUS,
-                        MenuOption.NEXT,
-                        MenuOption.DELETE
-                };
-            }
+            MenuOption[] detailOptions = {
+                    MenuOption.BACK,
+                    MenuOption.PREVIOUS,
+                    MenuOption.NEXT,
+                    MenuOption.DELETE
+            };
             MenuOption selected = Menu.prompt(TITLE, "Promotion Details", detailOptions);
             switch (selected) {
                 case BACK:
                     return;
                 case PREVIOUS:
-                    if (cursor.hasPrevious()) {
-                        promotion = cursor.previous();
+                    Promotion prevPromotion = stepToPrevious(cursor);
+                    if (prevPromotion != null) {
+                        promotion = prevPromotion;
                     } else {
                         OutputHelper.printErr("This is the first promotion.");
                         InputHelper.waitForEnter();
@@ -788,46 +826,73 @@ public class LoyaltyUI {
             MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
             if (selected == MenuOption.BACK) return;
             int choice = InputHelper.readInt("Select Notification > ");
+            if (choice == 0) return;
             if (choice < 1 || choice > notifications.length) {
                 OutputHelper.printErr("Please enter number between 1 and " + notifications.length + ".");
                 InputHelper.waitForEnter();
                 continue;
             }
-            displayNotificationDetails(control.getNotificationCursor(currentMember, choice - 1));
+            if (currentMember == null) {
+                displayGuestNotificationDetails(notifications, choice - 1);
+            } else {
+                displayNotificationDetails(control.getNotificationCursor(currentMember, choice - 1));
+            }
             return;
+        }
+    }
+    private void displayGuestNotificationDetails(Notification[] notifications, int index) {
+        for (;;) {
+            OutputHelper.clearScreen();
+            OutputHelper.printTitle("Notification Details");
+            System.out.println();
+            printNotification(notifications[index]);
+            MenuOption[] detailOptions = { MenuOption.BACK, MenuOption.PREVIOUS, MenuOption.NEXT };
+            MenuOption selected = Menu.prompt(TITLE, "Notification Details", detailOptions);
+            switch (selected) {
+                case BACK: return;
+                case PREVIOUS:
+                    if (index > 0) {
+                        index--;
+                    } else {
+                        OutputHelper.printErr("This is the first notification.");
+                        InputHelper.waitForEnter();
+                    }
+                    break;
+                case NEXT:
+                    if (index < notifications.length - 1) {
+                        index++;
+                    } else {
+                        OutputHelper.printErr("This is the last notification.");
+                        InputHelper.waitForEnter();
+                    }
+                    break;
+                default: break;
+            }
         }
     }
     private void displayNotificationDetails(DoublyLinkedList<Notification>.Cursor cursor) {
         Notification notification = cursor.next();
         for (;;) {
-            if (currentMember != null && !notification.getIsRead()) notification.read();
+            if (!notification.getIsRead()) notification.read();
             OutputHelper.clearScreen();
             OutputHelper.printTitle("Notification Details");
             System.out.println();
             printNotification(notification);
             System.out.println("Status: " + (notification.getIsRead() ? "Read" : "Unread"));
-            MenuOption[] detailOptions;
-            if (currentMember == null) {
-                detailOptions = new MenuOption[] {
-                            MenuOption.BACK,
-                            MenuOption.PREVIOUS,
-                            MenuOption.NEXT
-                };
-            } else {
-               detailOptions = new MenuOption[] {
-                            MenuOption.BACK,
-                            MenuOption.PREVIOUS,
-                            MenuOption.NEXT,
-                            MenuOption.DELETE
-                };
-            }
+            MenuOption[] detailOptions = {
+                    MenuOption.BACK,
+                    MenuOption.PREVIOUS,
+                    MenuOption.NEXT,
+                    MenuOption.DELETE
+            };
             MenuOption selected = Menu.prompt(TITLE, "Notification Details", detailOptions);
             switch (selected) {
                 case BACK:
                     return;
                 case PREVIOUS:
-                    if (cursor.hasPrevious()) {
-                        notification = cursor.previous();
+                    Notification prevNotification = stepToPrevious(cursor);
+                    if (prevNotification != null) {
+                        notification = prevNotification;
                     } else {
                         OutputHelper.printErr("This is the first notification.");
                         InputHelper.waitForEnter();
@@ -886,7 +951,8 @@ public class LoyaltyUI {
                 MenuOption.MANAGE_REWARDS,
                 MenuOption.MANAGE_TIERS,
                 MenuOption.MANAGE_NOTIFICATIONS,
-                MenuOption.MANAGE_REDEMPTIONS
+                MenuOption.MANAGE_REDEMPTIONS,
+                MenuOption.REPORTS
         };
         for (;;) {
             if (currentAdmin == null) return;
@@ -914,10 +980,11 @@ public class LoyaltyUI {
                 case MANAGE_REDEMPTIONS:
                     manageRedemptionUI();
                     break;
+                case REPORTS:
+                    reportsMenu();
                 default:
                     break;
             }
-            InputHelper.waitForEnter();
         }
     }
     private void manageMemberUI() {
@@ -958,6 +1025,7 @@ public class LoyaltyUI {
         Member member = control.findMemberByUsername(username);
         if (member == null) {
             OutputHelper.printErr("Member not found.");
+            InputHelper.waitForEnter();
             return null;
         }
         return member;
@@ -965,13 +1033,13 @@ public class LoyaltyUI {
     private void editMember(Member member) {
         OutputHelper.clearScreen();
         OutputHelper.printTitle("Edit Member");
-        String name = InputHelper.readLine("New Name (or 0 to cancel): ");
+        String name = InputHelper.readLine("New Name (or press enter to skip or 0 to cancel): ");
         if (name.equals("0")) return;
-        String password = InputHelper.readLine("New Password (or 0 to cancel): ");
+        String password = InputHelper.readLine("New Password (or press enter to skip or 0 to cancel): ");
         if (password.equals("0")) return;
         LoyaltyTier tier = null;
         for (;;) {
-            String tierInput = InputHelper.readLine("New Tier (Silver/Gold/Platinum, or 0 to cancel): ");
+            String tierInput = InputHelper.readLine("New Tier (Silver/Gold/Platinum, or press enter to skip or 0 to cancel): ");
             if (tierInput.equals("0")) return;
             if (!tierInput.isBlank()) {
                 switch (tierInput.trim().toLowerCase()) {
@@ -992,7 +1060,7 @@ public class LoyaltyUI {
             }
             break;
         }
-        int pointsInput = InputHelper.readInt("New Points (or 0 to cancel): ");
+        int pointsInput = InputHelper.readInt("New Points (or -1 to skip or 0 to cancel): ");
         if (pointsInput == 0) return;
         if (control.updateMember(member, name, password, tier, pointsInput)) {
             OutputHelper.printOK("Member updated successfully.");
@@ -1029,43 +1097,60 @@ public class LoyaltyUI {
         Promotion[] promotions = control.getAllPromotions();
         if (promotions.length == 0) {
             OutputHelper.printBlue("No promotions available.");
+            InputHelper.waitForEnter();
             return;
         }
         String[][] cells = new String[promotions.length][];
         for (int i = 0; i < promotions.length; i++) {
             cells[i] = new String[]{String.valueOf(i + 1), promotions[i].getLabel(), promotions[i].getExpiryDate()};
         }
-        print(TableRenderer.renderBordered(new String[]{"No.", "Promotion", "Expires"}, cells, null));
-        int choice = InputHelper.readInt("Select Promotion (0 to cancel) > ");
-        if (choice < 1 || choice > promotions.length) return;
-        Promotion promotion = promotions[choice - 1];
-        String newExpiry = InputHelper.readLine("New Expiry Date (blank to keep '" + promotion.getExpiryDate() + "'): ");
-        if (!newExpiry.isBlank()) promotion.setExpiryDate(newExpiry);
-        if (InputHelper.readLine("Change target tiers? (Y/N): ").equalsIgnoreCase("Y")) {
-            LoyaltyTier[] oldTiers = promotion.getTargetTiers();
-            LoyaltyTier[] newTiers = selectPromotionTiers();
-            promotion.setTargetTiers(newTiers);
-            for (Member member : control.getAllMembers()) {
-                boolean was = containsTier(oldTiers, member.getCurrentTier());
-                boolean now = containsTier(newTiers, member.getCurrentTier());
-                if (now && !was) {
-                    control.assignPromotion(member, promotion);
-                    control.postPromotionNotification(member, promotion);
-                } else if (!now && was) {
-                    control.removePromotion(member, promotion);
+        for(;;) {
+            print(TableRenderer.renderBordered(new String[]{"No.", "Promotion", "Expires"}, cells, null));
+            int choice = InputHelper.readInt("Select Promotion (0 to cancel) > ");
+            if (choice == 0) return;
+            if (choice < 1 || choice > promotions.length) {
+                OutputHelper.printErr("Please enter number between 1 and " + promotions.length + ".");
+                InputHelper.waitForEnter();
+                continue;
+            }
+            Promotion promotion = promotions[choice - 1];
+            String newExpiry = InputHelper.readLine("New Expiry Date (press enter to keep '" + promotion.getExpiryDate() + "'): ");
+            if (!newExpiry.isBlank()) promotion.setExpiryDate(newExpiry);
+            if (InputHelper.readLine("Change target tiers? (Y/N): ").equalsIgnoreCase("Y")) {
+                LoyaltyTier[] oldTiers = promotion.getTargetTiers();
+                LoyaltyTier[] newTiers = selectPromotionTiers();
+                promotion.setTargetTiers(newTiers);
+                for (Member member : control.getAllMembers()) {
+                    boolean was = containsTier(oldTiers, member.getCurrentTier());
+                    boolean now = containsTier(newTiers, member.getCurrentTier());
+                    if (now && !was) {
+                        control.assignPromotion(member, promotion);
+                        control.postPromotionNotification(member, promotion);
+                    } else if (!now && was) {
+                        control.removePromotion(member, promotion);
+                    }
                 }
             }
+            break;
         }
         OutputHelper.printOK("Promotion updated.");
     }
     private void createPromotionUI() {
-        String label = InputHelper.readLine("Label: ");
-        String description = InputHelper.readLine("Description: ");
-        String startDate = InputHelper.readLine("Start Date: ");
-        String expiryDate = InputHelper.readLine("Expiry Date: ");
+        String label = InputHelper.readLine("Label (or 0 to cancel): ");
+        if (label.equals("0")) return;
+        String description = InputHelper.readLine("Description (or 0 to cancel): ");
+        if (description.equals("0")) return;
+        String startDate = InputHelper.readLine("Start Date (or 0 to cancel): ");
+        if (startDate.equals("0")) return;
+        String expiryDate = InputHelper.readLine("Expiry Date (or 0 to cancel): ");
+        if (expiryDate.equals("0")) return;
         LoyaltyTier[] tiers = selectPromotionTiers();
         Promotion promotion = control.createPromotion(label, description, startDate, expiryDate, tiers);
-        if (promotion == null) { OutputHelper.printErr("Unable to create promotion."); return; }
+        if (promotion == null) {
+            OutputHelper.printErr("Unable to create promotion.");
+            InputHelper.waitForEnter();
+            return;
+        }
         for (Member member : control.getAllMembers()) {
             if (containsTier(tiers, member.getCurrentTier())) {
                 control.assignPromotion(member, promotion);
@@ -1073,41 +1158,50 @@ public class LoyaltyUI {
             }
         }
         OutputHelper.printOK("Promotion created: " + promotion.getPromotionID());
+        InputHelper.waitForEnter();
     }
     private LoyaltyTier[] selectPromotionTiers() {
-        System.out.println("Select target tiers.");
-        System.out.println("[1] Guest");
-        System.out.println("[2] Silver");
-        System.out.println("[3] Gold");
-        System.out.println("[4] Platinum");
-        System.out.println("Enter choices separated by commas.");
-        String input = InputHelper.readLine("Tiers: ");
-        String[] values = input.split(",");
-        LoyaltyTier[] result = new LoyaltyTier[values.length];
-        int count = 0;
-        for (String value : values) {
-            String trimmed = value.trim();
-            switch (trimmed) {
-                case "1":
-                    result[count++] = LoyaltyTier.GUEST;
-                    break;
-                case "2":
-                    result[count++] = LoyaltyTier.SILVER;
-                    break;
-                case "3":
-                    result[count++] = LoyaltyTier.GOLD;
-                    break;
-                case "4":
-                    result[count++] = LoyaltyTier.PLATINUM;
-                    break;
-                default:
-                    break;
+        for (;;) {
+            System.out.println("Select target tiers.");
+            System.out.println("[1] Guest");
+            System.out.println("[2] Silver");
+            System.out.println("[3] Gold");
+            System.out.println("[4] Platinum");
+            System.out.println("Enter choices separated by commas.");
+            String input = InputHelper.readLine("Tiers: ");
+            String[] values = input.split(",");
+            LoyaltyTier[] result = new LoyaltyTier[values.length];
+            int count = 0;
+            for (String value : values) {
+                String trimmed = value.trim();
+                switch (trimmed) {
+                    case "1":
+                        result[count++] = LoyaltyTier.GUEST;
+                        break;
+                    case "2":
+                        result[count++] = LoyaltyTier.SILVER;
+                        break;
+                    case "3":
+                        result[count++] = LoyaltyTier.GOLD;
+                        break;
+                    case "4":
+                        result[count++] = LoyaltyTier.PLATINUM;
+                        break;
+                    default:
+                        break;
+                }
+            }
+            if (count == result.length) {
+                return result;
+            } else if (count == 0) {
+                OutputHelper.printErr("Please enter number between 1 and 4.");
+                InputHelper.waitForEnter();
+            } else {
+                LoyaltyTier[] trimmedResult = new LoyaltyTier[count];
+                System.arraycopy(result, 0, trimmedResult, 0, count);
+                return trimmedResult;
             }
         }
-        if (count == result.length) return result;
-        LoyaltyTier[] trimmedResult = new LoyaltyTier[count];
-        System.arraycopy(result, 0, trimmedResult, 0, count);
-        return trimmedResult;
     }
     private boolean containsTier(LoyaltyTier[] tiers, LoyaltyTier tier) {
         for (LoyaltyTier t : tiers) {
@@ -1152,40 +1246,55 @@ public class LoyaltyUI {
         }
         print(TableRenderer.renderBordered(new String[]{"ID", "Reward", "Points", "State"},
                 cells, new Align[]{Align.LEFT, Align.LEFT, Align.RIGHT, Align.LEFT}));
-        int id = InputHelper.readInt("Enter Reward ID to edit/delete (0 to cancel) > ");
+        int id = InputHelper.readInt("Enter Reward ID to edit/disable (0 to cancel) > ");
         if (id == 0) return;
         Reward reward = control.findRewardByID(id);
-        if (reward == null) { OutputHelper.printErr("Reward not found."); return; }
+        if (reward == null) {
+            OutputHelper.printErr("Reward not found.");
+            InputHelper.waitForEnter();
+            return;
+        }
+        System.out.println("\nReward: " + reward.getRewardName() + "\nDescription: " + reward.getDescription() + "\nPoints required: " + reward.getRequiredPoints() + "\n");
         MenuOption[] options = {
                 MenuOption.BACK,
                 MenuOption.EDIT_REWARD,
                 MenuOption.DISABLE_REWARD
         };
         MenuOption selected = Menu.prompt(TITLE, "Select an option", options);
-        switch(selected) {
+        switch (selected) {
             case BACK:
                 return;
             case EDIT_REWARD:
-                String name = InputHelper.readLine("New Name (blank to keep): ");
-                if (!name.isBlank()) reward.setRewardName(name);
-                String desc = InputHelper.readLine("New Description (blank to keep): ");
-                if (!desc.isBlank()) reward.setDescription(desc);
-                String pointsStr = InputHelper.readLine("New Required Points (blank to keep): ");
-                if (!pointsStr.isBlank()) reward.setRequiredPoints(Integer.parseInt(pointsStr));
-                OutputHelper.printOK("Reward updated.");
+                editRewardUI(reward);
                 break;
             case DISABLE_REWARD:
                 if (control.disableReward(id)) {
                     OutputHelper.printOK("Reward disabled.");
                 } else {
                     OutputHelper.printErr("Unable to disable reward.");
+                    InputHelper.waitForEnter();
                 }
         }
     }
+    private void editRewardUI(Reward reward) {
+        String name = InputHelper.readLine("New Name (or press enter to skip, or 0 to cancel): ");
+        if (name.equals("0")) return;
+        if (!name.isBlank()) reward.setRewardName(name);
+        String desc = InputHelper.readLine("New Description (or press enter to skip, or 0 to cancel): ");
+        if (desc.equals("0")) return;
+        if (!desc.isBlank()) reward.setDescription(desc);
+        int points = InputHelper.readInt("New Required Points (or press -1, or 0 to cancel): ");
+        if (points == 0) return;
+        if (points != -1) reward.setRequiredPoints(points);
+        OutputHelper.printOK("Reward updated.");
+    }
     private void addRewardUI() {
-        String name = InputHelper.readLine("Reward Name: ");
-        String description = InputHelper.readLine("Description: ");
-        int points = InputHelper.readInt("Required Points: ");
+        String name = InputHelper.readLine("Reward Name (or 0 to cancel): ");
+        if (name.equals("0")) return;
+        String description = InputHelper.readLine("Description (or 0 to cancel): ");
+        if (description.equals("0")) return;
+        int points = InputHelper.readInt("Required Points (or 0 to cancel): ");
+        if (points == 0) return;
         OutputHelper.printOK(control.createReward(name, description, points) != null ? "Reward added." : "Unable to add reward.");
     }
     private void manageTierUI() {
@@ -1212,6 +1321,7 @@ public class LoyaltyUI {
                 case END_SEASON:
                     control.endSeason();
                     OutputHelper.printOK("Season ended. New season: " + control.getSeasonSummary());
+                    InputHelper.waitForEnter();
                     break;
                 default:
                     break;
@@ -1221,7 +1331,8 @@ public class LoyaltyUI {
     private void editTierRequirementUI() {
         LoyaltyTier tier = selectTier();
         if (tier == LoyaltyTier.GUEST) {
-            OutputHelper.printErr("Guest tier cannot be edited.");
+            OutputHelper.printErr("Error, please try again.");
+            InputHelper.waitForEnter();
             return;
         }
         OutputHelper.printTitle("Edit Tier Requirements");
@@ -1260,7 +1371,7 @@ public class LoyaltyUI {
         }
     }
     private LoyaltyTier selectTier() {
-        OutputHelper.printOptions(new String[]{"Back", "Guest", "Silver", "Gold", "Platinum"});
+        OutputHelper.printOptions(new String[]{"Back", "Silver", "Gold", "Platinum"});
         int choice = InputHelper.readInt("Select Tier: ");
         return switch (choice) {
             case 2 -> LoyaltyTier.SILVER;
@@ -1299,16 +1410,24 @@ public class LoyaltyUI {
         Notification[] notifications = control.getMemberNotifications(member);
         if (notifications.length == 0) {
             OutputHelper.printBlue("No notifications.");
+            InputHelper.waitForEnter();
             return;
         }
         String[][] cells = new String[notifications.length][];
-        for (int i = 0; i < notifications.length; i++) {
-            cells[i] = new String[]{String.valueOf(i + 1), notifications[i].getLabel()};
+        for (;;) {
+            for (int i = 0; i < notifications.length; i++) {
+                cells[i] = new String[]{String.valueOf(i + 1), notifications[i].getLabel()};
+            }
+            print(TableRenderer.renderBordered(new String[]{"No.", "Notification"}, cells, null));
+            int choice = InputHelper.readInt("Select Notification (0 to cancel) > ");
+            if (choice == 0) return;
+            if (choice < 1 || choice > notifications.length) {
+                OutputHelper.printErr("Please enter number between 1 and " + notifications.length + ".");
+                InputHelper.waitForEnter();
+                continue;
+            }
+            adminBrowseNotifications(control.getNotificationCursor(member, choice - 1));
         }
-        print(TableRenderer.renderBordered(new String[]{"No.", "Notification"}, cells, null));
-        int choice = InputHelper.readInt("Select Notification (0 to cancel) > ");
-        if (choice < 1 || choice > notifications.length) return;
-        adminBrowseNotifications(control.getNotificationCursor(member, choice - 1));
     }
     private void adminBrowseNotifications(DoublyLinkedList<Notification>.Cursor cursor) {
         Notification notification = cursor.next();
@@ -1326,8 +1445,9 @@ public class LoyaltyUI {
                 case BACK:
                     return;
                 case PREVIOUS:
-                    if (cursor.hasPrevious()) {
-                        cursor.previous();
+                    Notification prevNotification = stepToPrevious(cursor);
+                    if (prevNotification != null) {
+                        notification = prevNotification;
                     } else {
                         OutputHelper.printErr("This is the first notification.");
                         InputHelper.waitForEnter();
@@ -1361,13 +1481,20 @@ public class LoyaltyUI {
             return;
         }
         String[][] cells = new String[redemptions.length][];
-        for (int i = 0; i < redemptions.length; i++) {
-            cells[i] = new String[]{String.valueOf(i + 1), redemptions[i].getLabel()};
+        for (;;) {
+            for (int i = 0; i < redemptions.length; i++) {
+                cells[i] = new String[]{String.valueOf(i + 1), redemptions[i].getLabel()};
+            }
+            print(TableRenderer.renderBordered(new String[]{"No.", "Redemption"}, cells, null));
+            int choice = InputHelper.readInt("Select Redemption (0 to cancel) > ");
+            if (choice == 0) return;
+            if (choice < 1 || choice > redemptions.length) {
+                OutputHelper.printErr("Please enter number between 1 and " + redemptions.length + ".");
+                InputHelper.waitForEnter();
+                continue;
+            }
+            adminBrowseRedemptions(control.getRedemptionCursor(member, choice - 1));
         }
-        print(TableRenderer.renderBordered(new String[]{"No.", "Redemption"}, cells, null));
-        int choice = InputHelper.readInt("Select Redemption (0 to cancel) > ");
-        if (choice < 1 || choice > redemptions.length) return;
-        adminBrowseRedemptions(control.getRedemptionCursor(member, choice - 1));
     }
     private void adminBrowseRedemptions(DoublyLinkedList<Redemption>.Cursor cursor) {
         Redemption redemption = cursor.next();
@@ -1385,8 +1512,9 @@ public class LoyaltyUI {
                 case BACK:
                     return;
                 case PREVIOUS:
-                    if (cursor.hasPrevious()) {
-                        cursor.previous();
+                    Redemption prevRedemption = stepToPrevious(cursor);
+                    if (prevRedemption != null) {
+                        redemption = prevRedemption;
                     } else {
                         OutputHelper.printErr("This is the first redemption.");
                         InputHelper.waitForEnter();
@@ -1404,5 +1532,99 @@ public class LoyaltyUI {
                     break;
             }
         }
+    }
+    private void reportsMenu() {
+        MenuOption[] options = { MenuOption.BACK, MenuOption.TIER_PERFORMANCE_REPORT, MenuOption.REWARD_POPULARITY_REPORT };
+        for (;;) {
+            OutputHelper.clearScreen();
+            MenuOption selected = Menu.prompt(TITLE, "Reports", options);
+            switch (selected) {
+                case BACK: return;
+                case TIER_PERFORMANCE_REPORT: tierPerformanceReportUI(); break;
+                case REWARD_POPULARITY_REPORT: rewardPopularityReportUI(); break;
+                default: break;
+            }
+        }
+    }
+
+    private void tierPerformanceReportUI() {
+        OutputHelper.clearScreen();
+        LoyaltyTier tier = selectTier(); // reuses existing helper; GUEST means "All"
+        LoyaltyTier filterTier = (tier == LoyaltyTier.GUEST) ? null : tier;
+        int minPoints = InputHelper.readInt("Minimum seasonal points (0 for none) > ");
+        String searchUsername = InputHelper.readLine("Jump to username (or press enter to skip): ");
+        Member[] members = control.getTierPerformanceReport(filterTier, minPoints);
+        int highlight = searchUsername.isBlank() ? -1 : control.findMemberIndexByUsername(members, searchUsername);
+        OutputHelper.printReportHeader("Member Tier & Points Performance Report",
+                "Tier=" + (filterTier == null ? "All" : filterTier) + ", MinPoints=" + minPoints);
+        if (members.length == 0) {
+            System.out.println("No members match the selected criteria.");
+        } else {
+            String[][] cells = new String[members.length][];
+            int silverCount = 0, goldCount = 0, platinumCount = 0;
+            long silverSum = 0, goldSum = 0, platinumSum = 0;
+            for (int i = 0; i < members.length; i++) {
+                Member m = members[i];
+                String marker = (i == highlight) ? "-> " : "";
+                cells[i] = new String[]{
+                        marker + m.getMemberID(), m.getName(), m.getUsername(),
+                        String.valueOf(m.getCurrentTier()), String.valueOf(m.getSeasonalPoints())
+                };
+                switch (m.getCurrentTier()) {
+                    case SILVER: silverCount++; silverSum += m.getSeasonalPoints(); break;
+                    case GOLD: goldCount++; goldSum += m.getSeasonalPoints(); break;
+                    case PLATINUM: platinumCount++; platinumSum += m.getSeasonalPoints(); break;
+                    default: break;
+                }
+            }
+            print(TableRenderer.renderBordered(new String[]{"Member ID", "Name", "Username", "Tier", "Seasonal Points"},
+                    cells, new Align[]{Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT, Align.RIGHT}));
+            if (highlight == -1 && !searchUsername.isBlank()) {
+                System.out.println("\n(Username '" + searchUsername + "' not found in this filtered result.)");
+            }
+            String summary = String.format("Silver: %d (avg %.1f pts) | Gold: %d (avg %.1f pts) | Platinum: %d (avg %.1f pts)",
+                    silverCount, silverCount == 0 ? 0 : (double) silverSum / silverCount,
+                    goldCount, goldCount == 0 ? 0 : (double) goldSum / goldCount,
+                    platinumCount, platinumCount == 0 ? 0 : (double) platinumSum / platinumCount);
+            OutputHelper.printReportFooter(summary);
+        }
+        InputHelper.waitForEnter();
+    }
+
+    private void rewardPopularityReportUI() {
+        OutputHelper.clearScreen();
+        String from = InputHelper.readLine("From date dd-MM-yyyy (or enter to skip): ");
+        String to = InputHelper.readLine("To date dd-MM-yyyy (or enter to skip): ");
+        int minPoints = InputHelper.readInt("Minimum points spent (0 for none) > ");
+        String sortChoice = InputHelper.readLine("Sort by (C)ount or (P)oints? ");
+        boolean sortByCount = !sortChoice.trim().equalsIgnoreCase("P");
+        LoyaltyControl.RewardStat[] stats;
+        try {
+            stats = control.getRewardPopularityReport(from, to, minPoints, sortByCount);
+        } catch (Exception e) {
+            OutputHelper.printErr("Invalid date format. Use dd-MM-yyyy.");
+            InputHelper.waitForEnter();
+            return;
+        }
+        OutputHelper.printReportHeader("Redemption & Reward Popularity Report",
+                "From=" + (from.isBlank() ? "any" : from) + ", To=" + (to.isBlank() ? "any" : to) + ", MinPoints=" + minPoints + ", SortBy=" + (sortByCount ? "Count" : "Points"));
+        if (stats.length == 0) {
+            System.out.println("No redemptions match the selected criteria.");
+        } else {
+            String[][] cells = new String[stats.length][];
+            int totalRedemptions = 0, totalPoints = 0;
+            for (int i = 0; i < stats.length; i++) {
+                cells[i] = new String[]{
+                        stats[i].getLabel(), String.valueOf(stats[i].getCount()), String.valueOf(stats[i].getTotalPoints())
+                };
+                totalRedemptions += stats[i].getCount();
+                totalPoints += stats[i].getTotalPoints();
+            }
+            print(TableRenderer.renderBordered(new String[]{"Reward", "Times Redeemed", "Total Points Spent"},
+                    cells, new Align[]{Align.LEFT, Align.RIGHT, Align.RIGHT}));
+            String summary = "Total redemptions: " + totalRedemptions + " | Total points spent: " + totalPoints + " | Most popular: " + stats[0].getLabel();
+            OutputHelper.printReportFooter(summary);
+        }
+        InputHelper.waitForEnter();
     }
 }
