@@ -547,8 +547,9 @@ public class AllocationUI {
 
     private void printStarvation(Allocation[] rows, LoyaltyTier challenger) {
         System.out.println();
-        OutputHelper.printTitle("Overtake Risk");
-        OutputHelper.printBlue("A " + challenger + " guest walks in at minute " + control.getClockMinute()
+        OutputHelper.printReportHeader("Overtake Risk Report",
+                "challenger tier = " + challenger + ", clock at " + control.getClockMinute() + " min");
+        OutputHelper.printBlue("A " + challenger + " customer walks in at minute " + control.getClockMinute()
                 + " - who already waiting would they get in front of?");
         OutputHelper.printBlue("Waiting earns priority as it goes, so every request eventually becomes"
                 + " impossible to overtake. That is the anti-starvation guarantee.");
@@ -613,6 +614,10 @@ public class AllocationUI {
                 + " can no longer be overtaken");
         OutputHelper.printBlue("  Exposure left    = how much longer it stays overtakeable, counted from now");
         OutputHelper.printBlue("  " + DEAD_SCORE + " = ranked on special category, which no ordinary arrival reaches");
+
+        System.out.println();
+        OutputHelper.printReportFooter(String.format(
+                "Records : %d waiting    Exposed : %d    Safe : %d", rows.length, exposed, safe));
     }
 
     private void forecastReport() {
@@ -635,10 +640,10 @@ public class AllocationUI {
 
     private void printForecast(Forecast forecast, int lookAhead) {
         System.out.println();
-        OutputHelper.printTitle("Fulfilment Forecast");
-        OutputHelper.printBlue("looking ahead: "
-                + (lookAhead == 0 ? "whole queue (" + forecast.getQueued() + ")" : lookAhead + " serves")
-                + "    rooms ready: " + control.getReadyRoomCount());
+        OutputHelper.printReportHeader("Fulfilment Forecast Report",
+                "look-ahead = " + (lookAhead == 0 ? "whole queue (" + forecast.getQueued() + " waiting)"
+                        : lookAhead + " serves")
+                        + ", rooms ready = " + control.getReadyRoomCount());
         System.out.println();
 
         Allocation blocker = forecast.getBlocker();
@@ -705,6 +710,12 @@ public class AllocationUI {
                             : "room " + releasable.getRoomNo() + " is vacant and only needs cleaning ("
                                     + releasable.getHousekeepingStatus() + ")"));
         }
+
+        System.out.println();
+        OutputHelper.printReportFooter(String.format(
+                "Records : %d waiting    Served : %d    Blocked : %d    Upgrades : %d (RM %,.2f)",
+                forecast.getQueued(), forecast.getServed(), forecast.getBlocked(),
+                forecast.getUpgrades(), forecast.getUpgradeCost()));
     }
 
     /**
