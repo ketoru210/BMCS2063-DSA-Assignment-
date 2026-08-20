@@ -900,7 +900,7 @@ public class LoyaltyUI {
                     break;
                 case NEXT:
                     if (cursor.hasNext()) {
-                        cursor.next();
+                        notification = cursor.next();
                     } else {
                         OutputHelper.printErr("This is the last notification.");
                         InputHelper.waitForEnter();
@@ -1455,7 +1455,7 @@ public class LoyaltyUI {
                     break;
                 case NEXT:
                     if (cursor.hasNext()) {
-                        cursor.next();
+                        notification = cursor.next();
                     } else {
                         OutputHelper.printErr("This is the last notification.");
                         InputHelper.waitForEnter();
@@ -1522,7 +1522,7 @@ public class LoyaltyUI {
                     break;
                 case NEXT:
                     if (cursor.hasNext()) {
-                        cursor.next();
+                        redemption = cursor.next();
                     } else {
                         OutputHelper.printErr("This is the last redemption.");
                         InputHelper.waitForEnter();
@@ -1546,7 +1546,6 @@ public class LoyaltyUI {
             }
         }
     }
-
     private void tierPerformanceReportUI() {
         OutputHelper.clearScreen();
         LoyaltyTier tier = selectTier(); // reuses existing helper; GUEST means "All"
@@ -1590,7 +1589,6 @@ public class LoyaltyUI {
         }
         InputHelper.waitForEnter();
     }
-
     private void rewardPopularityReportUI() {
         OutputHelper.clearScreen();
         String from = InputHelper.readLine("From date dd-MM-yyyy (or enter to skip): ");
