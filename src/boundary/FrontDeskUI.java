@@ -148,9 +148,9 @@ public class FrontDeskUI {
     }
 
     private void newWalkIn() {
-        String name = InputHelper.readLine("\nGuest name > ");
+        String name = InputHelper.readLine("\nCustomer name > ");
         if (name.isEmpty()) {
-            OutputHelper.printErr("Guest name is required.");
+            OutputHelper.printErr("Customer name is required.");
             InputHelper.waitForEnter();
             return;
         }
@@ -353,7 +353,7 @@ public class FrontDeskUI {
             return;
         }
 
-        String[] headers = {"CONF NO", "GUEST", "TYPE", "NIGHTS", "STATUS", "CHARGE"};
+        String[] headers = {"CONF NO", "NAME", "TYPE", "NIGHTS", "STATUS", "CHARGE"};
         Align[] aligns = {Align.LEFT, Align.LEFT, Align.LEFT, Align.RIGHT, Align.LEFT, Align.RIGHT};
         String[][] cells = new String[batch.length][];
         for (int i = 0; i < batch.length; i++) {

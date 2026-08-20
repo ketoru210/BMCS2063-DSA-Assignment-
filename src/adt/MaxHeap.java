@@ -211,6 +211,24 @@ public class MaxHeap<T extends Comparable<T>> implements CollectionInterface<T> 
     }
 
     /**
+     * How many stored entries outrank the probe, which is how far down the serve
+     * order it sits. Heap order makes most of the walk unnecessary: a subtree
+     * whose root does not outrank the probe cannot hold anything that does, so
+     * it is skipped whole and only the entries actually counted are ever
+     * touched - where reading the same answer off a sorted copy costs n log n.
+     */
+    public int rankOf(T probe) {
+        return probe == null ? -1 : outranking(probe, 0);
+    }
+
+    private int outranking(T probe, int index) {
+        if (index >= size || heap[index].compareTo(probe) <= 0) {
+            return 0;
+        }
+        return 1 + outranking(probe, 2 * index + 1) + outranking(probe, 2 * index + 2);
+    }
+
+    /**
      * Adds every entry of another collection, restoring the heap property once
      * over the whole array instead of once per entry.
      * <p>

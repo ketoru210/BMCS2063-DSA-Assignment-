@@ -225,6 +225,78 @@ public class AllocationControl {
         return null;
     }
 
+    /**
+     * Which identifier a search is asking about. Naming it is not a convenience:
+     * an entry no. and a confirmation no. can be the same width, so a term alone
+     * cannot say which one was meant.
+     */
+    public enum SearchKey {
+        ENTRY_NO("Entry no."),
+        CONFIRMATION_NO("Confirmation no."),
+        // not "guest": GUEST is a tier, and this is the person's name whatever their tier
+        CUSTOMER_NAME("Customer name");
+
+        private final String label;
+
+        SearchKey(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    /**
+     * Entries whose chosen identifier answers to the term. That identifier is
+     * never the sort key, so no ordering can be exploited and the walk is the
+     * honest cost; what the heap does give cheaply is where each hit lands in
+     * the serve order.
+     */
+    public Allocation[] search(SearchKey key, String term) {
+        if (key == null || term == null || term.isBlank()) {
+            return new Allocation[0];
+        }
+        String needle = term.trim().toLowerCase();
+
+        Allocation[] hits = new Allocation[queue.size()];
+        int found = 0;
+        Iterator<Allocation> walker = queue.getIterator();
+        while (walker.hasNext()) {
+            Allocation entry = walker.next();
+            if (answersTo(entry, key, needle)) {
+                hits[found++] = entry;
+            }
+        }
+
+        Allocation[] exact = new Allocation[found];
+        for (int i = 0; i < found; i++) {
+            exact[i] = hits[i];
+        }
+        return exact;
+    }
+
+    private boolean answersTo(Allocation entry, SearchKey key, String needle) {
+        switch (key) {
+            case ENTRY_NO:
+                String typed = needle.startsWith("#") ? needle.substring(1) : needle;
+                return typed.equals(String.valueOf(entry.getEntryNo()));
+            case CONFIRMATION_NO:
+                return needle.equals(entry.getBooking().getConfirmationNo().toLowerCase());
+            case CUSTOMER_NAME:
+                // a partial name is what somebody at the desk actually has to go on
+                return entry.getBooking().getMember().getName().toLowerCase().contains(needle);
+            default:
+                return false;
+        }
+    }
+
+    /** Where the entry sits in the serve order, counted from 1, without sorting. */
+    public int getServePosition(Allocation entry) {
+        return entry == null ? 0 : heap.rankOf(entry) + 1;
+    }
+
     /** Score to show the user: always positive, and ranks exactly like the stored key. */
     public long livePriority(Allocation entry) {
         return entry.getInvariantPriority() + clockMinute;
