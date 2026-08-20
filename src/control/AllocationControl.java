@@ -154,7 +154,9 @@ public class AllocationControl {
      * Insertion sort rather than a divide-and-conquer sort: level order already
      * puts every parent ahead of its own descendants, so the array arrives
      * partially ordered and the inner loop seldom runs. The cost is proportional
-     * to the number of inversions, which on a heap layout is far below n squared.
+     * to the number of inversions, so a near-ordered arrival is close to linear;
+     * the worst case is still n squared, which at the size of a waiting queue is
+     * a price worth paying for an adaptive, stable, allocation-free sort.
      */
     public Allocation[] getServeOrder() {
         Allocation[] entries = getLevelOrder();
@@ -297,7 +299,7 @@ public class AllocationControl {
         return entry == null ? 0 : heap.rankOf(entry) + 1;
     }
 
-    /** Score to show the user: always positive, and ranks exactly like the stored key. */
+    /** Score to show the user: never negative, and ranks exactly like the stored key. */
     public long livePriority(Allocation entry) {
         return entry.getInvariantPriority() + clockMinute;
     }
@@ -422,10 +424,57 @@ public class AllocationControl {
     /**
      * Tier weight minus arrival minute - the priority the entry would have at
      * minute zero. The live score adds the same clock reading to everybody, so
-     * dropping it changes no ordering and the stored key never goes stale.
+     * dropping it changes no ordering and waiting alone never dates the key.
+     * A tier does date it, which is what {@link #reprioritise()} is for.
      */
     private long computeInvariantPriority(Allocation entry) {
         return entry.getTier().getWeight() - entry.getArrivalMinute();
+    }
+
+    /**
+     * Whether the stored key still matches what the rule would compute now. The
+     * key is a snapshot taken at admission and a tier change over in M5 does not
+     * reach into this queue, so this is what asks whether the snapshot has aged out.
+     */
+    public boolean hasOutdatedKey(Allocation entry) {
+        return entry != null
+                && entry.getInvariantPriority() != computeInvariantPriority(entry);
+    }
+
+    public int countOutdatedKeys() {
+        Iterator<Allocation> walker = queue.getIterator();
+        int outdated = 0;
+        while (walker.hasNext()) {
+            if (hasOutdatedKey(walker.next())) {
+                outdated++;
+            }
+        }
+        return outdated;
+    }
+
+    /**
+     * Re-keys every entry whose member has changed tier since it joined, and
+     * returns how many moved.
+     * <p>
+     * Each one leaves the heap before its key is touched and goes back in
+     * afterwards: remove(T) locates by compareTo, so mutating the key first would
+     * send the search down the wrong subtree and strand the entry under a key the
+     * heap is no longer ordered by.
+     * <p>
+     * The walk is over a level-order copy rather than the live iterator, because
+     * the collection is being changed as it goes.
+     */
+    public int reprioritise() {
+        Allocation[] entries = getLevelOrder();
+        int moved = 0;
+        for (Allocation entry : entries) {
+            if (hasOutdatedKey(entry) && queue.remove(entry)) {
+                entry.setInvariantPriority(computeInvariantPriority(entry));
+                queue.add(entry);
+                moved++;
+            }
+        }
+        return moved;
     }
 
     // ================= report criteria =================

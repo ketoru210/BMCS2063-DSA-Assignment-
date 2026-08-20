@@ -11,6 +11,7 @@ import entity.LoyaltyTier;
 import entity.Room;
 import entity.RoomType;
 import entity.SpecialCategory;
+import java.time.format.DateTimeFormatter;
 import utility.InputHelper;
 import utility.MenuItem;
 import utility.OutputHelper;
@@ -39,6 +40,7 @@ public class AllocationUI {
     private static final String TITLE = "VIP & Loyalty Tier-Priority Room Allocation";
     private static final int MIN_CELL = 8;
     private static final String DEAD_SCORE = "N/A";
+    private static final DateTimeFormatter STAY_DATE = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final AllocationControl control;
 
@@ -57,6 +59,7 @@ public class AllocationUI {
         SERVE("Serve Next Request"),
         ADD("Add Request to Queue"),
         CANCEL("Cancel a Request"),
+        REPRIORITISE("Reprioritise Changed Tiers"),
         SEARCH("Search the Queue"),
         FILTER("Filter the Queue"),
         STARVATION("Report: Overtake Risk"),
@@ -93,7 +96,8 @@ public class AllocationUI {
             clearFirst = selected != MenuOption.FAST_FORWARD
                     && selected != MenuOption.SERVE
                     && selected != MenuOption.ADD
-                    && selected != MenuOption.CANCEL;
+                    && selected != MenuOption.CANCEL
+                    && selected != MenuOption.REPRIORITISE;
 
             switch (selected) {
                 case BACK:
@@ -109,6 +113,9 @@ public class AllocationUI {
                     break;
                 case CANCEL:
                     cancelRequest();
+                    break;
+                case REPRIORITISE:
+                    reprioritiseQueue();
                     break;
                 case SEARCH:
                     searchQueue();
@@ -260,16 +267,19 @@ public class AllocationUI {
     // --- actions ---
 
     private void fastForwardClock() {
-        int minutes = InputHelper.readInt("\nFast-forward by how many minutes (0 = cancel) > ");
-        if (minutes == 0) {
-            return;
+        for (;;) {
+            int minutes = InputHelper.readInt("\nFast-forward by how many minutes (0 = back) > ");
+            if (minutes == 0) {
+                return;
+            }
+            if (minutes < 0) {
+                OutputHelper.printErr("Minutes must be positive.");
+                continue;
+            }
+            control.fastForward(minutes);
+            notice = "Clock is now at " + control.getClockMinute() + " min.";
+            OutputHelper.printOK(notice);
         }
-        if (minutes < 0) {
-            fail("Minutes must be positive.");
-            return;
-        }
-        control.fastForward(minutes);
-        notice = "Clock is now at " + control.getClockMinute() + " min.";
     }
 
     private void serveNext() {
@@ -306,60 +316,106 @@ public class AllocationUI {
                 + " whose booking had already moved on.";
     }
 
+    /**
+     * Queues one booking after another until the desk backs out. The candidate
+     * list is rebuilt every round, so a booking just queued drops off it.
+     */
     private void addRequest() {
-        Booking[] candidates = control.getQueueableBookings();
-        if (candidates.length == 0) {
-            fail("No confirmed booking is waiting for a room.");
-            return;
-        }
+        for (;;) {
+            Booking[] candidates = control.getQueueableBookings();
+            if (candidates.length == 0) {
+                fail("No confirmed booking is waiting for a room.");
+                return;
+            }
 
-        String[] bookings = new String[candidates.length];
-        for (int i = 0; i < candidates.length; i++) {
-            bookings[i] = String.valueOf(candidates[i]);
-        }
-        int pick = askFrom("Confirmed bookings not yet queued:", bookings);
-        if (pick < 0) {
-            return;
-        }
+            String[][] cells = new String[candidates.length][];
+            for (int i = 0; i < candidates.length; i++) {
+                Booking booking = candidates[i];
+                cells[i] = new String[]{
+                    String.valueOf(i + 1),
+                    booking.getConfirmationNo(),
+                    booking.getMember().getName(),
+                    String.valueOf(booking.getRoomType()),
+                    booking.getCheckIn().format(STAY_DATE)
+                            + " - " + booking.getCheckOut().format(STAY_DATE),
+                    String.valueOf(booking.getNights()),
+                    booking.getStatus()
+                };
+            }
+            int pick = askFromTable("Confirmed bookings not yet queued:",
+                    new String[]{"No.", "Conf No.", "Customer", "Room Type", "Stay", "Nights", "Status"},
+                    cells,
+                    new Align[]{Align.RIGHT, Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT,
+                        Align.RIGHT, Align.LEFT});
+            if (pick < 0) {
+                return;
+            }
 
-        SpecialCategory[] bands = SpecialCategory.values();
-        String[] bandLabels = new String[bands.length];
-        for (int i = 0; i < bands.length; i++) {
-            bandLabels[i] = bands[i] == SpecialCategory.NONE ? "None" : bands[i].toString();
-        }
-        int band = askFrom("Special category:", bandLabels);
-        if (band < 0) {
-            return;
-        }
+            SpecialCategory[] bands = SpecialCategory.values();
+            String[] bandLabels = new String[bands.length];
+            for (int i = 0; i < bands.length; i++) {
+                bandLabels[i] = bands[i] == SpecialCategory.NONE ? "None" : bands[i].toString();
+            }
+            int band = askFrom("Special category:", bandLabels);
+            if (band < 0) {
+                // backing out of the category only undoes the booking just picked
+                continue;
+            }
 
-        Allocation added = control.enqueue(candidates[pick], bands[band]);
-        if (added == null) {
-            fail("That booking could not join the queue.");
-            return;
+            Allocation added = control.enqueue(candidates[pick], bands[band]);
+            if (added == null) {
+                OutputHelper.printErr("That booking could not join the queue.");
+                continue;
+            }
+            notice = "Queued as #" + added.getEntryNo()
+                    + " at minute " + added.getArrivalMinute() + ".";
+            System.out.println();
+            OutputHelper.printOK(notice);
         }
-        notice = "Queued as #" + added.getEntryNo() + " at minute " + added.getArrivalMinute() + ".";
     }
 
+    /**
+     * A wrong confirmation number asks again rather than dropping back to the menu:
+     * the desk is reading it off a guest, and a typo should not cost the screen.
+     */
     private void cancelRequest() {
-        String confirmationNo = InputHelper.readLine("\nConfirmation no. to cancel (0 = back) > ");
-        if (confirmationNo.equals("0")) {
-            return;
-        }
-        if (confirmationNo.isEmpty()) {
-            fail("A confirmation number is required.");
-            return;
-        }
+        for (;;) {
+            String confirmationNo = InputHelper.readLine("\nConfirmation no. to cancel (0 = back) > ");
+            if (confirmationNo.equals("0")) {
+                return;
+            }
+            if (confirmationNo.isEmpty()) {
+                OutputHelper.printErr("A confirmation number is required.");
+                continue;
+            }
 
-        Allocation entry = control.findByConfirmationNo(confirmationNo);
-        if (entry == null) {
-            fail("No queued request carries that confirmation number.");
+            Allocation entry = control.findByConfirmationNo(confirmationNo);
+            if (entry == null) {
+                OutputHelper.printErr("No queued request carries that confirmation number.");
+                continue;
+            }
+            if (!control.cancel(entry)) {
+                OutputHelper.printErr("Could not remove that request.");
+                continue;
+            }
+            notice = "Removed #" + entry.getEntryNo() + " from the queue.";
             return;
         }
-        if (!control.cancel(entry)) {
-            fail("Could not remove that request.");
+    }
+
+    /**
+     * Re-keys the entries whose member changed tier after they joined. Kept on
+     * screen rather than clearing, so the redraw underneath shows them move.
+     */
+    private void reprioritiseQueue() {
+        int outdated = control.countOutdatedKeys();
+        if (outdated == 0) {
+            notice = "Every entry is keyed on its member's current tier.";
             return;
         }
-        notice = "Removed #" + entry.getEntryNo() + " from the queue.";
+        int moved = control.reprioritise();
+        notice = "Re-keyed " + moved + (moved == 1 ? " entry" : " entries")
+                + " whose tier changed since admission.";
     }
 
     // --- reports ---
@@ -375,39 +431,43 @@ public class AllocationUI {
      * follows: how far down the queue it is.
      */
     private void searchQueue() {
-        OutputHelper.printTitle("Search the Queue");
-        if (control.isEmpty()) {
-            fail("Nobody is waiting.");
-            return;
-        }
+        for (;;) {
+            OutputHelper.printTitle("Search the Queue");
+            if (control.isEmpty()) {
+                fail("Nobody is waiting.");
+                return;
+            }
 
-        SearchKey key = askSearchKey();
-        if (key == null) {
-            return;
-        }
+            SearchKey key = askSearchKey();
+            if (key == null) {
+                return;
+            }
 
-        // only a name is worth matching on a fragment; the two numbers are exact
-        String prompt = key + (key == SearchKey.CUSTOMER_NAME ? " (part of it is enough)" : "");
-        String term = InputHelper.readLine("\n" + prompt + " > ");
+            // only a name is worth matching on a fragment; the two numbers are exact
+            String prompt = key + (key == SearchKey.CUSTOMER_NAME ? " (part of it is enough)" : "");
+            String term = InputHelper.readLine("\n" + prompt + " > ");
 
-        Allocation[] hits = control.search(key, term);
-        if (hits.length == 0) {
-            fail("No request in the queue has that " + key + ".");
-            return;
-        }
+            Allocation[] hits = control.search(key, term);
+            if (hits.length == 0) {
+                System.out.println();
+                OutputHelper.printErr("No request in the queue has that " + key + ".");
+                continue;
+            }
 
-        System.out.println();
-        OutputHelper.printBlue("matched " + hits.length + " of " + control.size() + " waiting");
-        System.out.println();
-        printHits(hits);
-
-        if (hits.length == 1) {
-            int position = control.getServePosition(hits[0]);
             System.out.println();
-            OutputHelper.printOK("  served " + position + " of " + control.size()
-                    + "    " + (position - 1) + " ahead, " + (control.size() - position) + " behind");
+            OutputHelper.printBlue("matched " + hits.length + " of " + control.size() + " waiting");
+            System.out.println();
+            printHits(hits);
+
+            if (hits.length == 1) {
+                int position = control.getServePosition(hits[0]);
+                System.out.println();
+                OutputHelper.printOK("  served " + position + " of " + control.size()
+                        + "    " + (position - 1) + " ahead, "
+                        + (control.size() - position) + " behind");
+            }
+            InputHelper.waitForEnter();
         }
-        InputHelper.waitForEnter();
     }
 
     private void printHits(Allocation[] hits) {
@@ -442,41 +502,44 @@ public class AllocationUI {
      * to, so the answer is a shape of the queue rather than a listing of it.
      */
     private void filterQueue() {
-        OutputHelper.printTitle("Filter the Queue");
-        if (control.isEmpty()) {
-            fail("Nobody is waiting.");
-            return;
-        }
-
-        Field field = askField();
-        if (field == null) {
-            return;
-        }
-
-        // only the exposure figure depends on who might turn up next
-        LoyaltyTier challenger = LoyaltyTier.PLATINUM;
-        if (field == Field.EXPOSURE) {
-            challenger = askChallenger();
-            if (challenger == null) {
+        for (;;) {
+            OutputHelper.printTitle("Filter the Queue");
+            if (control.isEmpty()) {
+                fail("Nobody is waiting.");
                 return;
             }
-        }
 
-        Operator[] ops = Operator.values();
-        int comparison = askComparison(field, ops, "Back");
-        if (comparison == 0) {
-            return;
-        }
-        Long chosen = askThreshold(field, challenger);
-        if (chosen == null) {
-            return;
-        }
-        long threshold = chosen;
+            Field field = askField();
+            if (field == null) {
+                return;
+            }
 
-        Allocation[] rows = control.filterBy(control.getServeOrder(), field,
-                ops[comparison - 1], threshold, challenger);
-        printFilter(rows, field, ops[comparison - 1], threshold);
-        InputHelper.waitForEnter();
+            // only the exposure figure depends on who might turn up next
+            LoyaltyTier challenger = LoyaltyTier.PLATINUM;
+            if (field == Field.EXPOSURE) {
+                challenger = askChallenger();
+                if (challenger == null) {
+                    // a sub-step back only restarts the question, it does not leave
+                    continue;
+                }
+            }
+
+            Operator[] ops = Operator.values();
+            int comparison = askComparison(field, ops, "Back");
+            if (comparison == 0) {
+                continue;
+            }
+            Long chosen = askThreshold(field, challenger);
+            if (chosen == null) {
+                continue;
+            }
+            long threshold = chosen;
+
+            Allocation[] rows = control.filterBy(control.getServeOrder(), field,
+                    ops[comparison - 1], threshold, challenger);
+            printFilter(rows, field, ops[comparison - 1], threshold);
+            InputHelper.waitForEnter();
+        }
     }
 
     private void printFilter(Allocation[] rows, Field field, Operator op, long threshold) {
@@ -621,7 +684,6 @@ public class AllocationUI {
     }
 
     private void forecastReport() {
-        OutputHelper.clearScreen();
         if (control.isEmpty()) {
             fail("Nobody is waiting.");
             return;
@@ -737,6 +799,31 @@ public class AllocationUI {
                 return pick - 1;
             }
             OutputHelper.printErr("Please enter a number between 0 and " + labels.length + ".");
+        }
+    }
+
+    /**
+     * As above, but the choices are rows of a bordered table rather than single
+     * labels, so a multi-column list keeps its headings instead of running
+     * together. The first column is expected to be the number the caller types.
+     * Returns -1 when the user backs out.
+     */
+    private int askFromTable(String title, String[] headers, String[][] cells, Align[] aligns) {
+        System.out.println("\n" + title);
+        String[] table = TableRenderer.renderBordered(headers, cells, aligns);
+        for (int i = 0; i < table.length; i++) {
+            System.out.println(table[i]);
+        }
+        System.out.println("[0] Back");
+        for (;;) {
+            int pick = InputHelper.readInt("\nPlease Select > ");
+            if (pick == 0) {
+                return -1;
+            }
+            if (pick >= 1 && pick <= cells.length) {
+                return pick - 1;
+            }
+            OutputHelper.printErr("Please enter a number between 0 and " + cells.length + ".");
         }
     }
 

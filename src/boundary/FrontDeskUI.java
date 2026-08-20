@@ -149,27 +149,32 @@ public class FrontDeskUI {
     }
 
     private void newWalkIn() {
-        String name = InputHelper.readLine("\nCustomer name > ");
-        if (name.isEmpty()) {
-            OutputHelper.printErr("Customer name is required.");
-            InputHelper.waitForEnter();
-            return;
-        }
+        for (;;) {
+            String name = InputHelper.readLine("\nCustomer name (0 = back) > ");
+            if (name.equals("0")) {
+                return;
+            }
+            if (name.isEmpty()) {
+                OutputHelper.printErr("Customer name is required.");
+                continue;
+            }
 
-        RoomType roomType = readRoomType();
-        if (roomType == null) {
-            return;
-        }
+            RoomType roomType = readRoomType();
+            if (roomType == null) {
+                // a sub-step back only restarts the booking, it does not leave
+                continue;
+            }
 
-        int nights = InputHelper.readInt("Nights > ");
-        Booking booking = control.createWalkIn(name, roomType, nights);
-        if (booking == null) {
-            OutputHelper.printErr("Nights must be at least 1.");
-            InputHelper.waitForEnter();
-            return;
+            int nights = InputHelper.readInt("Nights > ");
+            Booking booking = control.createWalkIn(name, roomType, nights);
+            if (booking == null) {
+                OutputHelper.printErr("Nights must be at least 1.");
+                continue;
+            }
+            notice = "Booked. Confirmation no. " + booking.getConfirmationNo()
+                    + " (" + money(control.revenueOf(booking)) + ")";
+            OutputHelper.printOK(notice);
         }
-        notice = "Booked. Confirmation no. " + booking.getConfirmationNo()
-                + " (" + money(control.revenueOf(booking)) + ")";
     }
 
     private RoomType readRoomType() {
@@ -188,104 +193,138 @@ public class FrontDeskUI {
         for (int i = 0; i < menu.length; i++) {
             System.out.println(menu[i]);
         }
-        int choice = InputHelper.readInt("Room type > ");
-        if (choice < 1 || choice > types.length) {
-            OutputHelper.printErr("No such room type.");
-            InputHelper.waitForEnter();
-            return null;
+        System.out.println("[0] Back");
+        for (;;) {
+            int choice = InputHelper.readInt("Room type > ");
+            if (choice == 0) {
+                return null;
+            }
+            if (choice >= 1 && choice <= types.length) {
+                return types[choice - 1];
+            }
+            OutputHelper.printErr("Please enter a number between 0 and " + types.length + ".");
         }
-        return types[choice - 1];
     }
 
     private void lookUp() {
-        String confirmationNo = InputHelper.readLine("\nConfirmation no. > ");
-        Booking found = control.findByConfirmationNo(confirmationNo);
+        for (;;) {
+            String confirmationNo = InputHelper.readLine("\nConfirmation no. (0 = back) > ");
+            if (confirmationNo.equals("0")) {
+                return;
+            }
+            Booking found = control.findByConfirmationNo(confirmationNo);
 
-        System.out.println();
-        if (found != null) {
-            OutputHelper.printOK("Found in " + control.getTreeHeight() + " comparisons at most:");
-            System.out.println("  " + found);
-            System.out.println("  Charge: " + money(control.revenueOf(found))
-                    + " (" + found.getNights() + " nights)");
-        } else {
-            OutputHelper.printErr("No booking with confirmation no. " + confirmationNo);
-            Booking below = control.nearestBelow(confirmationNo);
-            Booking above = control.nearestAbove(confirmationNo);
-            if (below == null && above == null) {
-                System.out.println("  Nothing on file to compare against.");
+            System.out.println();
+            if (found != null) {
+                OutputHelper.printOK("Found in " + control.getTreeHeight()
+                        + " comparisons at most:");
+                System.out.println("  " + found);
+                System.out.println("  Charge: " + money(control.revenueOf(found))
+                        + " (" + found.getNights() + " nights)");
             } else {
-                System.out.println("  Closest on file:");
-                if (below != null) {
-                    System.out.println("    below > " + below);
-                }
-                if (above != null) {
-                    System.out.println("    above > " + above);
+                OutputHelper.printErr("No booking with confirmation no. " + confirmationNo);
+                Booking below = control.nearestBelow(confirmationNo);
+                Booking above = control.nearestAbove(confirmationNo);
+                if (below == null && above == null) {
+                    System.out.println("  Nothing on file to compare against.");
+                } else {
+                    System.out.println("  Closest on file:");
+                    if (below != null) {
+                        System.out.println("    below > " + below);
+                    }
+                    if (above != null) {
+                        System.out.println("    above > " + above);
+                    }
                 }
             }
+            InputHelper.waitForEnter();
         }
-        InputHelper.waitForEnter();
     }
 
     private void checkIn() {
-        String confirmationNo = InputHelper.readLine("\nConfirmation no. > ");
-        if (control.checkIn(confirmationNo)) {
-            notice = "Checked in " + confirmationNo + ".";
-            return;
-        }
+        for (;;) {
+            String confirmationNo = InputHelper.readLine("\nConfirmation no. (0 = back) > ");
+            if (confirmationNo.equals("0")) {
+                return;
+            }
+            if (control.checkIn(confirmationNo)) {
+                notice = "Checked in " + confirmationNo + ".";
+                OutputHelper.printOK(notice);
+                continue;
+            }
 
-        Booking found = control.findByConfirmationNo(confirmationNo);
-        OutputHelper.printErr("\n" + (found == null
-                ? "No booking with confirmation no. " + confirmationNo
-                : found.isAllocated()
-                        ? "Cannot check in: status is " + found.getStatus() + "."
-                        : "Cannot check in: status is " + found.getStatus()
-                                + " and no room has been allocated."));
-        InputHelper.waitForEnter();
+            Booking found = control.findByConfirmationNo(confirmationNo);
+            OutputHelper.printErr(found == null
+                    ? "No booking with confirmation no. " + confirmationNo
+                    : found.isAllocated()
+                            ? "Cannot check in: status is " + found.getStatus() + "."
+                            : "Cannot check in: status is " + found.getStatus()
+                                    + " and no room has been allocated.");
+        }
     }
 
     private void checkOut() {
-        String confirmationNo = InputHelper.readLine("\nConfirmation no. > ");
-        Booking found = control.findByConfirmationNo(confirmationNo);
-        // read while the booking still holds it — checking out lets the room go
-        String roomNo = found != null && found.isAllocated() ? found.getRoom().getRoomNo() : "-";
+        for (;;) {
+            String confirmationNo = InputHelper.readLine("\nConfirmation no. (0 = back) > ");
+            if (confirmationNo.equals("0")) {
+                return;
+            }
+            Booking found = control.findByConfirmationNo(confirmationNo);
+            // read while the booking still holds it — checking out lets the room go
+            String roomNo = found != null && found.isAllocated()
+                    ? found.getRoom().getRoomNo() : "-";
 
-        if (control.checkOut(confirmationNo)) {
-            notice = "Checked out " + confirmationNo + ". Room " + roomNo
-                    + " is back in the pool and now Dirty for housekeeping.";
-            return;
+            if (control.checkOut(confirmationNo)) {
+                notice = "Checked out " + confirmationNo + ". Room " + roomNo
+                        + " is back in the pool and now Dirty for housekeeping.";
+                OutputHelper.printOK(notice);
+                continue;
+            }
+            OutputHelper.printErr(found == null
+                    ? "No booking with confirmation no. " + confirmationNo
+                    : "Cannot check out: status is " + found.getStatus() + ", not Checked-in.");
         }
-        OutputHelper.printErr("\n" + (found == null
-                ? "No booking with confirmation no. " + confirmationNo
-                : "Cannot check out: status is " + found.getStatus() + ", not Checked-in."));
-        InputHelper.waitForEnter();
     }
 
+    /**
+     * A wrong confirmation number asks again rather than dropping back to the menu:
+     * the desk is reading it off a guest, and a typo should not cost the screen.
+     */
     private void cancel() {
-        String confirmationNo = InputHelper.readLine("\nConfirmation no. > ");
-        Booking found = control.findByConfirmationNo(confirmationNo);
-        if (found == null) {
-            OutputHelper.printErr("\nNo booking with confirmation no. " + confirmationNo);
-            InputHelper.waitForEnter();
-            return;
-        }
-        if (!control.isCancellable(found)) {
-            OutputHelper.printErr("\nAlready " + found.getStatus() + " - nothing to cancel.");
-            InputHelper.waitForEnter();
-            return;
-        }
+        for (;;) {
+            String confirmationNo = InputHelper.readLine("\nConfirmation no. to cancel (0 = back) > ");
+            if (confirmationNo.equals("0")) {
+                return;
+            }
+            if (confirmationNo.isEmpty()) {
+                OutputHelper.printErr("A confirmation number is required.");
+                continue;
+            }
 
-        System.out.println("\n  " + found);
-        String answer = InputHelper.readLine("Cancel this booking? [y/N] > ");
-        if (!answer.equalsIgnoreCase("y")) {
-            notice = "Cancellation aborted.";
+            Booking found = control.findByConfirmationNo(confirmationNo);
+            if (found == null) {
+                OutputHelper.printErr("No booking with confirmation no. " + confirmationNo);
+                continue;
+            }
+            if (!control.isCancellable(found)) {
+                OutputHelper.printErr("Already " + found.getStatus() + " - nothing to cancel.");
+                continue;
+            }
+
+            System.out.println("\n  " + found);
+            String answer = InputHelper.readLine("Cancel this booking? [y/N] > ");
+            if (!answer.equalsIgnoreCase("y")) {
+                notice = "Cancellation aborted.";
+                return;
+            }
+
+            Booking cancelled = control.cancel(confirmationNo);
+            notice = cancelled == null
+                    ? "Nothing was cancelled."
+                    : "Cancelled " + cancelled.getConfirmationNo() + ". It stays on file as "
+                            + cancelled.getStatus() + ", and any room or queue place it held is released.";
             return;
         }
-
-        Booking cancelled = control.cancel(confirmationNo);
-        notice = cancelled == null
-                ? "Nothing was cancelled."
-                : "Cancelled " + cancelled.getConfirmationNo() + ". It stays on file as "
-                        + cancelled.getStatus() + ", and any room or queue place it held is released.";
     }
 
     /** The only path that takes a node out of the tree, so the height can move. */
@@ -345,7 +384,6 @@ public class FrontDeskUI {
     }
 
     private void rangeAudit() {
-        OutputHelper.clearScreen();
         OutputHelper.printTitle("Confirmation Range Audit");
 
         String low = InputHelper.readLine("\nFrom confirmation no. > ");
