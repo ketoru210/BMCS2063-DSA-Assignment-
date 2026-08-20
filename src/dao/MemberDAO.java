@@ -1,5 +1,7 @@
 package dao;
 
+import adt.CollectionInterface;
+import adt.DoublyLinkedList;
 import entity.LoyaltyTier;
 import entity.Member;
 import entity.Notification;
@@ -166,46 +168,65 @@ public class MemberDAO {
             )
     };
 
-    public Member[] getAllMembers() {
-        Member[] result = new Member[SEEDS.length];
-        for (int i = 0; i < SEEDS.length; i++) result[i] = SEEDS[i].member;
-        return result;
+    public CollectionInterface<Member> getAllMembers() {
+        CollectionInterface<Member> members = new DoublyLinkedList<>();
+        for (MemberSeed seed : SEEDS) {
+            members.add(seed.member);
+        }
+        return members;
     }
+
     public Member findByUsername(String username) {
         if (username == null) return null;
         for (MemberSeed seed : SEEDS) if (seed.member.getUsername().equals(username)) return seed.member;
         return null;
     }
-    public Promotion[] getAllPromotions() { return PROMOTIONS; }
-    public Notification[] getGuestNotifications() {
-        return new Notification[]{
-                seedFor("chongml").notifications[0],
-                seedFor("arunk").notifications[0]
-        };
+
+    public CollectionInterface<Promotion> getAllPromotions() { return pack(PROMOTIONS); }
+
+    public CollectionInterface<Notification> getGuestNotifications() {
+        CollectionInterface<Notification> notifications = new DoublyLinkedList<>();
+        notifications.add(seedFor("chongml").notifications[0]);
+        notifications.add(seedFor("arunk").notifications[0]);
+        return notifications;
     }
+
     // by username, not index: SEEDS order shifts whenever a member is seeded in
     private static MemberSeed seedFor(String username) {
         for (MemberSeed seed : SEEDS) if (seed.member.getUsername().equals(username)) return seed;
         return null;
     }
-    public Promotion[][] getAllPromotionRecords() {
-        Promotion[][] result = new Promotion[SEEDS.length][];
-        for (int i = 0; i < SEEDS.length; i++) result[i] = SEEDS[i].promotions;
-        return result;
+
+    private static MemberSeed seedOf(Member member) {
+        return member == null ? null : seedFor(member.getUsername());
     }
-    public Notification[][] getAllNotificationRecords() {
-        Notification[][] result = new Notification[SEEDS.length][];
-        for (int i = 0; i < SEEDS.length; i++) result[i] = SEEDS[i].notifications;
-        return result;
+
+    /** Wraps a seed row in the team ADT; the caller owns the container, not the entries. */
+    private static <T extends Comparable<T>> CollectionInterface<T> pack(T[] entries) {
+        CollectionInterface<T> packed = new DoublyLinkedList<>();
+        for (T entry : entries) {
+            packed.add(entry);
+        }
+        return packed;
     }
-    public Redemption[][] getAllRedemptionRecords() {
-        Redemption[][] result = new Redemption[SEEDS.length][];
-        for (int i = 0; i < SEEDS.length; i++) result[i] = SEEDS[i].redemptions;
-        return result;
+
+    public CollectionInterface<Promotion> getPromotionRecords(Member member) {
+        MemberSeed seed = seedOf(member);
+        return seed == null ? new DoublyLinkedList<>() : pack(seed.promotions);
     }
-    public Tier[][] getAllTierRecords() {
-        Tier[][] result = new Tier[SEEDS.length][];
-        for (int i = 0; i < SEEDS.length; i++) result[i] = SEEDS[i].tiers;
-        return result;
+
+    public CollectionInterface<Notification> getNotificationRecords(Member member) {
+        MemberSeed seed = seedOf(member);
+        return seed == null ? new DoublyLinkedList<>() : pack(seed.notifications);
+    }
+
+    public CollectionInterface<Redemption> getRedemptionRecords(Member member) {
+        MemberSeed seed = seedOf(member);
+        return seed == null ? new DoublyLinkedList<>() : pack(seed.redemptions);
+    }
+
+    public CollectionInterface<Tier> getTierRecords(Member member) {
+        MemberSeed seed = seedOf(member);
+        return seed == null ? new DoublyLinkedList<>() : pack(seed.tiers);
     }
 }

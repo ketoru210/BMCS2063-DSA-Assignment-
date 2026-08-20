@@ -1,5 +1,6 @@
 package control;
 
+import adt.CollectionInterface;
 import adt.DoublyLinkedList;
 import dao.AdminDAO;
 import dao.MemberDAO;
@@ -54,45 +55,40 @@ public class LoyaltyControl {
         adminDAO = new AdminDAO();
         rewardDAO = new RewardDAO();
         tierRequirementDAO = new TierRequirementDAO();
-        rewards = rewardDAO.getRewards();
-        tierRequirements = tierRequirementDAO.getAllTierRequirements();
+        CollectionInterface<Reward> seededRewards = rewardDAO.getRewards();
+        CollectionInterface<TierRequirement> seededRequirements = tierRequirementDAO.getAllTierRequirements();
+        rewards = drain(seededRewards, new Reward[seededRewards.size()]);
+        tierRequirements = drain(seededRequirements, new TierRequirement[seededRequirements.size()]);
         loadMemberData();
         initializeSeason();
     }
     private void loadMemberData() {
-        Member[] members = memberDAO.getAllMembers();
-        Promotion[][] promotions = memberDAO.getAllPromotionRecords();
-        Notification[][] notifications = memberDAO.getAllNotificationRecords();
-        Redemption[][] redemptions = memberDAO.getAllRedemptionRecords();
-        Tier[][] tiers = memberDAO.getAllTierRecords();
-        for (int i = 0; i < members.length; i++) {
-            Member member = members[i];
+        Iterator<Member> walker = memberDAO.getAllMembers().getIterator();
+        while (walker.hasNext()) {
+            Member member = walker.next();
             if (!memberDoublyLinkedList.contains(member)) memberDoublyLinkedList.add(member);
-            loadPromotions(member, promotions[i]);
-            loadNotifications(member, notifications[i]);
-            loadRedemptions(member, redemptions[i]);
-            loadTierRecords(member, tiers[i]);
+            load(member.getPromotionRecords(), memberDAO.getPromotionRecords(member));
+            load(member.getNotificationRecords(), memberDAO.getNotificationRecords(member));
+            load(member.getRedemptionRecords(), memberDAO.getRedemptionRecords(member));
+            load(member.getTierRecords(), memberDAO.getTierRecords(member));
         }
     }
-    private void loadPromotions(Member member, Promotion[] records) {
-        for (Promotion promotion : records) {
-            if (!member.getPromotionRecords().contains(promotion)) member.getPromotionRecords().add(promotion);
+    /** Copies a seed container into the member's own, skipping what is already there. */
+    private static <T extends Comparable<T>> void load(CollectionInterface<T> target, CollectionInterface<T> records) {
+        Iterator<T> walker = records.getIterator();
+        while (walker.hasNext()) {
+            T record = walker.next();
+            if (!target.contains(record)) target.add(record);
         }
     }
-    private void loadNotifications(Member member, Notification[] records) {
-        for (Notification notification : records) {
-            if (!member.getNotificationRecords().contains(notification)) member.getNotificationRecords().add(notification);
+    /** Copies a DAO container into the array shape the rest of the module still speaks. */
+    private static <T extends Comparable<T>> T[] drain(CollectionInterface<T> source, T[] target) {
+        Iterator<T> walker = source.getIterator();
+        int index = 0;
+        while (walker.hasNext()) {
+            target[index++] = walker.next();
         }
-    }
-    private void loadRedemptions(Member member, Redemption[] records) {
-        for (Redemption redemption : records) {
-            if (!member.getRedemptionRecords().contains(redemption)) member.getRedemptionRecords().add(redemption);
-        }
-    }
-    private void loadTierRecords(Member member, Tier[] records) {
-        for (Tier tier : records) {
-            if (!member.getTierRecords().contains(tier)) member.getTierRecords().add(tier);
-        }
+        return target;
     }
     private void initializeSeason() {
         LocalDate today = LocalDate.now();
@@ -270,7 +266,9 @@ public class LoyaltyControl {
     }
     public Promotion[] getGuestPromotions() {
         Promotion[] temp = new Promotion[0];
-        for (Promotion promotion : memberDAO.getAllPromotions()) {
+        Iterator<Promotion> walker = memberDAO.getAllPromotions().getIterator();
+        while (walker.hasNext()) {
+            Promotion promotion = walker.next();
             LoyaltyTier[] targetTiers = promotion.getTargetTiers();
             for (LoyaltyTier tier : targetTiers) {
                 if (tier == LoyaltyTier.GUEST) {
@@ -313,7 +311,8 @@ public class LoyaltyControl {
         return member.getPromotionRecords().remove(promotion);
     }
     public Notification[] getGuestNotifications() {
-        return memberDAO.getGuestNotifications();
+        CollectionInterface<Notification> guest = memberDAO.getGuestNotifications();
+        return drain(guest, new Notification[guest.size()]);
     }
     public Notification[] getMemberNotifications(Member member) {
         if (member == null) return new Notification[0];
@@ -415,7 +414,10 @@ public class LoyaltyControl {
         rewards = updated;
         return reward;
     }
-    public Promotion[] getAllPromotions() { return memberDAO.getAllPromotions(); }
+    public Promotion[] getAllPromotions() {
+        CollectionInterface<Promotion> all = memberDAO.getAllPromotions();
+        return drain(all, new Promotion[all.size()]);
+    }
     public Promotion createPromotion(String label, String description, String startDate, String expiryDate, LoyaltyTier[] targetTiers) {
         if (label == null || label.isBlank() || description == null || description.isBlank() || startDate == null || startDate.isBlank() || expiryDate == null || expiryDate.isBlank() || targetTiers == null || targetTiers.length == 0) return null;
         return new Promotion(label, description, startDate, expiryDate, targetTiers);

@@ -4,7 +4,6 @@ import adt.CollectionInterface;
 import adt.DoublyLinkedList;
 import entity.Room;
 import entity.RoomType;
-import java.util.Iterator;
 
 /**
  * DAO for Room entity master registry.
@@ -40,13 +39,4 @@ public class RoomDAO {
         return rooms;
     }
 
-    public Room[] getAllRooms() {
-        Room[] array = new Room[rooms.size()];
-        Iterator<Room> iterator = rooms.getIterator();
-        int index = 0;
-        while (iterator.hasNext()) {
-            array[index++] = iterator.next();
-        }
-        return array;
-    }
 }

@@ -32,17 +32,25 @@ public class HousekeepingControl {
     // --- queries ---
 
     public Room[] getAllRooms() {
-        return roomDAO.getAllRooms();
+        CollectionInterface<Room> rooms = roomDAO.getRoomCollection();
+        Room[] all = new Room[rooms.size()];
+        Iterator<Room> walker = rooms.getIterator();
+        int index = 0;
+        while (walker.hasNext()) {
+            all[index++] = walker.next();
+        }
+        return all;
     }
 
     public Room findRoom(String roomNo) {
         if (roomNo == null) {
             return null;
         }
-        Room[] rooms = roomDAO.getAllRooms();
-        for (int i = 0; i < rooms.length; i++) {
-            if (rooms[i] != null && rooms[i].getRoomNo().equalsIgnoreCase(roomNo)) {
-                return rooms[i];
+        Iterator<Room> walker = roomDAO.getRoomCollection().getIterator();
+        while (walker.hasNext()) {
+            Room room = walker.next();
+            if (room != null && room.getRoomNo().equalsIgnoreCase(roomNo)) {
+                return room;
             }
         }
         return null;

@@ -65,9 +65,9 @@ public class BookingControl {
     public BookingControl(HousekeepingControl housekeepingControl) {
         this.housekeepingControl = housekeepingControl;
 
-        Booking[] seeded = new BookingDAO().getAllBookings();
-        for (Booking booking : seeded) {
-            bookings.add(booking);
+        Iterator<Booking> seeded = new BookingDAO().getAllBookings().getIterator();
+        while (seeded.hasNext()) {
+            bookings.add(seeded.next());
         }
     }
 

@@ -1,17 +1,28 @@
 package dao;
 
+import adt.CollectionInterface;
+import adt.DoublyLinkedList;
 import entity.Admin;
+import java.util.Iterator;
 
 public class AdminDAO {
-    private static final Admin[] ADMINS = {
-            new Admin("admin1", "pw1234", "System Administrator"),
-            new Admin("admin2", "pw1234", "Resort Manager")
-    };
-    public Admin[] getAllAdmins() {
+    private static final CollectionInterface<Admin> ADMINS = seed();
+
+    private static CollectionInterface<Admin> seed() {
+        CollectionInterface<Admin> admins = new DoublyLinkedList<>();
+        admins.add(new Admin("admin1", "pw1234", "System Administrator"));
+        admins.add(new Admin("admin2", "pw1234", "Resort Manager"));
+        return admins;
+    }
+
+    public CollectionInterface<Admin> getAllAdmins() {
         return ADMINS;
     }
+
     public Admin findByUsername(String username) {
-        for (Admin admin : ADMINS) {
+        Iterator<Admin> walker = ADMINS.getIterator();
+        while (walker.hasNext()) {
+            Admin admin = walker.next();
             if (admin.getUsername().equals(username)) {
                 return admin;
             }
