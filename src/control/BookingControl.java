@@ -58,6 +58,10 @@ public class BookingControl {
     // has to reach M2's queue, so one of the two directions must be wired late
     private AllocationControl allocationControl;
 
+    // members live in M5; the desk books on their behalf and never touches
+    // MemberDAO itself, so the whole of that traffic goes through this one field
+    private LoyaltyControl loyaltyControl;
+
     private int rerolls;
 
     // private final Booking[] bookings;
@@ -73,6 +77,10 @@ public class BookingControl {
 
     public void attachAllocation(AllocationControl allocationControl) {
         this.allocationControl = allocationControl;
+    }
+
+    public void attachLoyalty(LoyaltyControl loyaltyControl) {
+        this.loyaltyControl = loyaltyControl;
     }
 
     
@@ -117,10 +125,95 @@ public class BookingControl {
         return new Booking(confirmationNo, null, null, null, null, null);
     }
 
+    // ---- member lookup ----
+
+    public Member[] getMembers() {
+        return loyaltyControl == null ? new Member[0] : loyaltyControl.getAllMembers();
+    }
+
+    /**
+     * Whoever the desk can identify from what the guest said. An exact member ID
+     * or username wins on its own; anything else is treated as a piece of a name,
+     * because that is all a caller on the phone usually gives.
+     */
+    public Member[] searchMembers(String query) {
+        if (query == null || query.isEmpty()) {
+            return new Member[0];
+        }
+        Member[] all = getMembers();
+
+        for (Member member : all) {
+            if (member.getMemberID().equalsIgnoreCase(query)
+                    || member.getUsername().equalsIgnoreCase(query)) {
+                return new Member[]{member};
+            }
+        }
+
+        String needle = query.toLowerCase();
+        Member[] buffer = new Member[all.length];
+        int matched = 0;
+        for (Member member : all) {
+            if (member.getName().toLowerCase().contains(needle)) {
+                buffer[matched++] = member;
+            }
+        }
+        Member[] found = new Member[matched];
+        for (int i = 0; i < matched; i++) {
+            found[i] = buffer[i];
+        }
+        return found;
+    }
+
+    /** Everything the registry holds for one member, in the tree's in-order walk. */
+    public Booking[] bookingsOf(Member member) {
+        if (member == null) {
+            return new Booking[0];
+        }
+        Booking[] buffer = new Booking[bookings.size()];
+        int matched = 0;
+        Iterator<Booking> walker = bookings.getIterator();
+        while (walker.hasNext()) {
+            Booking booking = walker.next();
+            if (member.equals(booking.getMember())) {
+                buffer[matched++] = booking;
+            }
+        }
+        Booking[] found = new Booking[matched];
+        for (int i = 0; i < matched; i++) {
+            found[i] = buffer[i];
+        }
+        return found;
+    }
+
+    /**
+     * The live stay this member already holds that overlaps the requested dates,
+     * or null when the dates are free. Cancelled and checked-out stays are closed
+     * business and cannot clash; a stay that ends on the day another begins does
+     * not overlap, because the room is given up that morning.
+     */
+    public Booking findClashingStay(Member member, LocalDate checkIn, LocalDate checkOut) {
+        if (member == null || checkIn == null || checkOut == null) {
+            return null;
+        }
+        Iterator<Booking> walker = bookings.getIterator();
+        while (walker.hasNext()) {
+            Booking booking = walker.next();
+            if (!member.equals(booking.getMember())
+                    || STATUS_CANCELLED.equals(booking.getStatus())
+                    || STATUS_CHECKED_OUT.equals(booking.getStatus())) {
+                continue;
+            }
+            if (checkIn.isBefore(booking.getCheckOut()) && booking.getCheckIn().isBefore(checkOut)) {
+                return booking;
+            }
+        }
+        return null;
+    }
+
     // ---- desk operations ----
 
     public Booking createWalkIn(String guestName, RoomType roomType, int nights){
-        if(guestName == null || guestName.isEmpty() || roomType == null || nights < 1){
+        if(guestName == null || guestName.isEmpty() || nights < 1){
             return null;
         }
         // GUEST, not the constructor's default of SILVER: a walk-in has not joined
@@ -128,10 +221,25 @@ public class BookingControl {
         Member guest = new Member(guestName.toLowerCase().replace(" ",""), "walkin", guestName,
                 LoyaltyTier.GUEST);
         LocalDate checkIn = LocalDate.now();
-        
+        return createBooking(guest, roomType, checkIn, checkIn.plusDays(nights));
+    }
+
+    /**
+     * Books an existing member, so unlike a walk-in the stay can start on a future
+     * date and the tier the member already carries is what M2 will queue them on.
+     * <p>
+     * The confirmation number is rerolled until the tree accepts it: add() refuses
+     * a duplicate key, which is the only check that the number is actually free.
+     */
+    public Booking createBooking(Member member, RoomType roomType, LocalDate checkIn, LocalDate checkOut){
+        if(member == null || roomType == null || checkIn == null || checkOut == null
+                || !checkOut.isAfter(checkIn)){
+            return null;
+        }
+
         Booking booking;
         do{
-            booking = new Booking(nextConfirmationNo(), guest, roomType, checkIn, checkIn.plusDays(nights), STATUS_CONFIRMED);
+            booking = new Booking(nextConfirmationNo(), member, roomType, checkIn, checkOut, STATUS_CONFIRMED);
             if(!bookings.add(booking)){
                 rerolls++;
                 booking = null;

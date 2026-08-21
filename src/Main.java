@@ -32,6 +32,8 @@ public class Main {
         // request back out of M2's queue. One of the two directions cannot be a
         // constructor argument, and this is it.
         BOOKINGS.attachAllocation(ALLOCATION_CONTROL);
+        // the desk books on behalf of members, and members are M5's data
+        BOOKINGS.attachLoyalty(LOYALTY_CONTROL);
     }
 
     private static final HousekeepingUI HOUSEKEEPING_UI = new HousekeepingUI(HOUSEKEEPING_CONTROL);

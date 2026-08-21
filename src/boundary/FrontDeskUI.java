@@ -3,8 +3,11 @@ package boundary;
 import control.BookingControl;
 import control.BookingControl.SortKey;
 import entity.Booking;
+import entity.Member;
 import entity.RoomType;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import utility.InputHelper;
 import utility.MenuItem;
 import utility.OutputHelper;
@@ -39,6 +42,7 @@ public class FrontDeskUI {
     private enum MenuOption implements MenuItem {
         BACK("Back to Main Menu"),
         NEW_BOOKING("New Walk-in Booking"),
+        MEMBER_BOOKING("New Booking for a Member"),
         LOOK_UP("Look Up Booking"),
         LIST("View All Bookings"),
         CHECK_IN("Check-in Guest"),
@@ -74,6 +78,9 @@ public class FrontDeskUI {
                     return;
                 case NEW_BOOKING:
                     newWalkIn();
+                    break;
+                case MEMBER_BOOKING:
+                    newMemberBooking();
                     break;
                 case LOOK_UP:
                     lookUp();
@@ -180,6 +187,158 @@ public class FrontDeskUI {
             notice = "Booked. Confirmation no. " + booking.getConfirmationNo()
                     + " (" + money(control.revenueOf(booking)) + ")";
             OutputHelper.printOK(notice);
+        }
+    }
+
+    /**
+     * The desk booking a member in, which a walk-in cannot cover: the stay may
+     * start on a future date, and the member keeps the tier M2 will queue them on
+     * instead of being admitted as an unranked guest.
+     */
+    private void newMemberBooking() {
+        for (;;) {
+            Member member = pickMember();
+            if (member == null) {
+                return;
+            }
+
+            System.out.println();
+            OutputHelper.printBlue(member.getMemberID() + "  " + member.getName()
+                    + "  (" + member.getCurrentTier() + ", " + member.getCurrentPoints() + " pts)");
+            Booking[] onFile = control.bookingsOf(member);
+            if (onFile.length == 0) {
+                System.out.println("No booking on file for this member yet.");
+            } else {
+                System.out.println(onFile.length + " booking"
+                        + (onFile.length == 1 ? "" : "s") + " already on file:");
+                printBookings(null, onFile);
+            }
+
+            RoomType roomType = readRoomType();
+            if (roomType == null) {
+                // a sub-step back only restarts the booking, it does not leave
+                continue;
+            }
+
+            LocalDate checkIn = readDate("Check-in date (dd-MM-yyyy, blank = today, 0 = back) > ");
+            if (checkIn == null) {
+                continue;
+            }
+
+            int nights = InputHelper.readInt("Nights > ");
+            if (nights < 1) {
+                OutputHelper.printErr("Nights must be at least 1.");
+                continue;
+            }
+            LocalDate checkOut = checkIn.plusDays(nights);
+
+            Booking clash = control.findClashingStay(member, checkIn, checkOut);
+            if (clash != null) {
+                OutputHelper.printErr(member.getName() + " is already booked over those dates: "
+                        + clash.getConfirmationNo() + " (" + clash.getCheckIn().format(STAY_DATE)
+                        + " - " + clash.getCheckOut().format(STAY_DATE) + ", " + clash.getStatus() + ").");
+                continue;
+            }
+
+            System.out.printf("%n  %s, %s to %s, %d night%s, %s%n",
+                    roomType, checkIn.format(STAY_DATE), checkOut.format(STAY_DATE),
+                    nights, nights == 1 ? "" : "s",
+                    money(roomType.getRatePerNight() * nights));
+            String answer = InputHelper.readLine("Confirm this booking? [y/N] > ");
+            if (!answer.equalsIgnoreCase("y")) {
+                OutputHelper.printErr("Booking abandoned.");
+                continue;
+            }
+
+            Booking booking = control.createBooking(member, roomType, checkIn, checkOut);
+            if (booking == null) {
+                OutputHelper.printErr("Could not create the booking with those details.");
+                continue;
+            }
+            notice = "Booked " + member.getName() + ". Confirmation no. "
+                    + booking.getConfirmationNo() + " (" + money(control.revenueOf(booking))
+                    + "). It now waits for a room in VIP & Loyalty Tier-Priority Room Allocation.";
+            return;
+        }
+    }
+
+    /** Null means the user backed out. */
+    private Member pickMember() {
+        for (;;) {
+            String query = InputHelper.readLine("\nMember ID, username or name (0 = back) > ");
+            if (query.equals("0")) {
+                return null;
+            }
+            if (query.isEmpty()) {
+                OutputHelper.printErr("Enter something to search on.");
+                continue;
+            }
+
+            Member[] matches = control.searchMembers(query);
+            if (matches.length == 0) {
+                OutputHelper.printErr("No member matches \"" + query
+                        + "\". A guest who has not joined is a walk-in booking instead.");
+                continue;
+            }
+            if (matches.length == 1) {
+                return matches[0];
+            }
+
+            System.out.println();
+            printMembers(matches);
+            System.out.println("[0] Search again");
+            for (;;) {
+                int pick = InputHelper.readInt("Member > ");
+                if (pick == 0) {
+                    break;
+                }
+                if (pick >= 1 && pick <= matches.length) {
+                    return matches[pick - 1];
+                }
+                OutputHelper.printErr("Please enter a number between 0 and " + matches.length + ".");
+            }
+        }
+    }
+
+    private void printMembers(Member[] members) {
+        String[] headers = {"No.", "Member ID", "Name", "Tier", "Points"};
+        Align[] aligns = {Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT, Align.RIGHT};
+        String[][] cells = new String[members.length][];
+        for (int i = 0; i < members.length; i++) {
+            cells[i] = new String[]{
+                String.valueOf(i + 1),
+                members[i].getMemberID(),
+                members[i].getName(),
+                String.valueOf(members[i].getCurrentTier()),
+                String.valueOf(members[i].getCurrentPoints())
+            };
+        }
+        String[] table = TableRenderer.renderBordered(headers, cells, aligns);
+        for (int i = 0; i < table.length; i++) {
+            System.out.println(table[i]);
+        }
+    }
+
+    /** Null means the user backed out; a blank line means today. */
+    private LocalDate readDate(String prompt) {
+        for (;;) {
+            String typed = InputHelper.readLine(prompt);
+            if (typed.equals("0")) {
+                return null;
+            }
+            if (typed.isEmpty()) {
+                return LocalDate.now();
+            }
+            try {
+                LocalDate date = LocalDate.parse(typed, STAY_DATE);
+                if (date.isBefore(LocalDate.now())) {
+                    OutputHelper.printErr("A stay cannot start in the past.");
+                    continue;
+                }
+                return date;
+            } catch (DateTimeParseException e) {
+                OutputHelper.printErr("Please enter the date as dd-MM-yyyy.");
+            }
         }
     }
 
