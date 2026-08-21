@@ -141,9 +141,11 @@ public class BookingControl {
             return new Member[0];
         }
         Member[] all = getMembers();
+        String padded = asMemberID(query);
 
         for (Member member : all) {
             if (member.getMemberID().equalsIgnoreCase(query)
+                    || member.getMemberID().equals(padded)
                     || member.getUsername().equalsIgnoreCase(query)) {
                 return new Member[]{member};
             }
@@ -162,6 +164,23 @@ public class BookingControl {
             found[i] = buffer[i];
         }
         return found;
+    }
+
+    /**
+     * A bare number read as the member ID it is short for, so the desk can type
+     * the 1 it sees rather than M00001. Null when the query is not a bare number,
+     * which leaves it to be matched as a name instead.
+     */
+    private String asMemberID(String query) {
+        if (query.length() > 5) {
+            return null;
+        }
+        for (int i = 0; i < query.length(); i++) {
+            if (!Character.isDigit(query.charAt(i))) {
+                return null;
+            }
+        }
+        return String.format("M%05d", Integer.parseInt(query));
     }
 
     /** Everything the registry holds for one member, in the tree's in-order walk. */
@@ -208,6 +227,30 @@ public class BookingControl {
             }
         }
         return null;
+    }
+
+    // ---- room pool, as M2 sees it ----
+
+    /**
+     * Rooms that could be handed over right now, per room type. Read straight off
+     * M2 rather than off M3: allocatable means Available and cleaned, and which
+     * pair of statuses that is belongs to the module that hands rooms out.
+     * <p>
+     * This is a snapshot of this minute, not of the stay being booked - a room is
+     * held from the moment it is allocated, and nothing in the system records what
+     * a given room will be doing on a date in October.
+     */
+    public int[] readyByType(){
+        return allocationControl == null
+                ? new int[RoomType.values().length]
+                : allocationControl.getReadyByType();
+    }
+
+    /** Bookings already queued for each room type, which is the competition. */
+    public int[] waitingByType(){
+        return allocationControl == null
+                ? new int[RoomType.values().length]
+                : allocationControl.getWaitingByType();
     }
 
     // ---- desk operations ----

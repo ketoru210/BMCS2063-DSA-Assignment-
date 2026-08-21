@@ -194,40 +194,37 @@ public class FrontDeskUI {
      * The desk booking a member in, which a walk-in cannot cover: the stay may
      * start on a future date, and the member keeps the tier M2 will queue them on
      * instead of being admitted as an unranked guest.
+     * <p>
+     * Walked through as numbered steps because the screen would otherwise put a
+     * rate table straight under the member's booking history with nothing saying
+     * what is being asked for.
      */
     private void newMemberBooking() {
         for (;;) {
+            OutputHelper.clearScreen();
+            OutputHelper.printTitle("New Booking for a Member");
+
+            step(1, "Find the member");
             Member member = pickMember();
             if (member == null) {
                 return;
             }
+            printMemberCard(member);
 
-            System.out.println();
-            OutputHelper.printBlue(member.getMemberID() + "  " + member.getName()
-                    + "  (" + member.getCurrentTier() + ", " + member.getCurrentPoints() + " pts)");
-            Booking[] onFile = control.bookingsOf(member);
-            if (onFile.length == 0) {
-                System.out.println("No booking on file for this member yet.");
-            } else {
-                System.out.println(onFile.length + " booking"
-                        + (onFile.length == 1 ? "" : "s") + " already on file:");
-                printBookings(null, onFile);
-            }
-
+            step(2, "Choose a room type");
             RoomType roomType = readRoomType();
             if (roomType == null) {
                 // a sub-step back only restarts the booking, it does not leave
                 continue;
             }
 
+            step(3, "Set the stay dates");
             LocalDate checkIn = readDate("Check-in date (dd-MM-yyyy, blank = today, 0 = back) > ");
             if (checkIn == null) {
                 continue;
             }
-
-            int nights = InputHelper.readInt("Nights > ");
-            if (nights < 1) {
-                OutputHelper.printErr("Nights must be at least 1.");
+            int nights = readNights();
+            if (nights == 0) {
                 continue;
             }
             LocalDate checkOut = checkIn.plusDays(nights);
@@ -237,22 +234,33 @@ public class FrontDeskUI {
                 OutputHelper.printErr(member.getName() + " is already booked over those dates: "
                         + clash.getConfirmationNo() + " (" + clash.getCheckIn().format(STAY_DATE)
                         + " - " + clash.getCheckOut().format(STAY_DATE) + ", " + clash.getStatus() + ").");
+                InputHelper.waitForEnter();
                 continue;
             }
 
-            System.out.printf("%n  %s, %s to %s, %d night%s, %s%n",
-                    roomType, checkIn.format(STAY_DATE), checkOut.format(STAY_DATE),
-                    nights, nights == 1 ? "" : "s",
-                    money(roomType.getRatePerNight() * nights));
+            step(4, "Confirm");
+            double charge = roomType.getRatePerNight() * nights;
+            System.out.println("  Member    : " + member.getMemberID() + "  " + member.getName()
+                    + "  (" + member.getCurrentTier() + ")");
+            System.out.println("  Room type : " + roomType + "  at "
+                    + money(roomType.getRatePerNight()) + " / night");
+            System.out.println("  Stay      : " + checkIn.format(STAY_DATE) + " to "
+                    + checkOut.format(STAY_DATE) + "  (" + nights + " night"
+                    + (nights == 1 ? "" : "s") + ")");
+            System.out.println("  Charge    : " + money(charge));
+            System.out.println();
+
             String answer = InputHelper.readLine("Confirm this booking? [y/N] > ");
             if (!answer.equalsIgnoreCase("y")) {
                 OutputHelper.printErr("Booking abandoned.");
+                InputHelper.waitForEnter();
                 continue;
             }
 
             Booking booking = control.createBooking(member, roomType, checkIn, checkOut);
             if (booking == null) {
                 OutputHelper.printErr("Could not create the booking with those details.");
+                InputHelper.waitForEnter();
                 continue;
             }
             notice = "Booked " + member.getName() + ". Confirmation no. "
@@ -262,10 +270,32 @@ public class FrontDeskUI {
         }
     }
 
+    private void step(int number, String title) {
+        System.out.println();
+        OutputHelper.printBlue("-- Step " + number + " of 4 : " + title + " --");
+    }
+
+    /** Who the desk has landed on, and what the registry already holds for them. */
+    private void printMemberCard(Member member) {
+        System.out.println();
+        OutputHelper.printOK("Booking for " + member.getMemberID() + "  " + member.getName()
+                + "  (" + member.getCurrentTier() + ", " + member.getCurrentPoints() + " pts)");
+
+        Booking[] onFile = control.bookingsOf(member);
+        if (onFile.length == 0) {
+            System.out.println("No booking on file for this member yet.");
+            return;
+        }
+        System.out.println(onFile.length + " booking" + (onFile.length == 1 ? "" : "s")
+                + " already on file:");
+        printBookings(null, onFile);
+    }
+
     /** Null means the user backed out. */
     private Member pickMember() {
         for (;;) {
-            String query = InputHelper.readLine("\nMember ID, username or name (0 = back) > ");
+            String query = InputHelper.readLine(
+                    "Member ID, username or name (e.g. 1, M00001, tanwm, Tan) (0 = back) > ");
             if (query.equals("0")) {
                 return null;
             }
@@ -285,6 +315,7 @@ public class FrontDeskUI {
             }
 
             System.out.println();
+            System.out.println(matches.length + " members match. Which one?");
             printMembers(matches);
             System.out.println("[0] Search again");
             for (;;) {
@@ -319,6 +350,20 @@ public class FrontDeskUI {
         }
     }
 
+    /** 0 means the user backed out. */
+    private int readNights() {
+        for (;;) {
+            int nights = InputHelper.readInt("Nights (0 = back) > ");
+            if (nights == 0) {
+                return 0;
+            }
+            if (nights >= 1) {
+                return nights;
+            }
+            OutputHelper.printErr("Nights must be at least 1.");
+        }
+    }
+
     /** Null means the user backed out; a blank line means today. */
     private LocalDate readDate(String prompt) {
         for (;;) {
@@ -342,22 +387,36 @@ public class FrontDeskUI {
         }
     }
 
+    /**
+     * The rate table with the room pool beside it, so the desk picks a type
+     * knowing what is behind it instead of guessing and finding out at allocation.
+     */
     private RoomType readRoomType() {
         RoomType[] types = RoomType.values();
+        int[] ready = control.readyByType();
+        int[] waiting = control.waitingByType();
+
         System.out.println();
         String[][] cells = new String[types.length][];
         for (int i = 0; i < types.length; i++) {
             cells[i] = new String[]{
                 String.valueOf(i + 1),
                 String.valueOf(types[i]),
-                money(types[i].getRatePerNight()) + " / night"
+                money(types[i].getRatePerNight()) + " / night",
+                String.valueOf(ready[i]),
+                String.valueOf(waiting[i])
             };
         }
-        String[] menu = TableRenderer.renderBordered(new String[]{"No.", "Room Type", "Rate"},
-                cells, new Align[]{Align.LEFT, Align.LEFT, Align.RIGHT});
+        String[] menu = TableRenderer.renderBordered(
+                new String[]{"No.", "Room Type", "Rate", "Ready", "Waiting"}, cells,
+                new Align[]{Align.LEFT, Align.LEFT, Align.RIGHT, Align.RIGHT, Align.RIGHT});
         for (int i = 0; i < menu.length; i++) {
             System.out.println(menu[i]);
         }
+        OutputHelper.printBlue(
+                "  Ready = free and cleaned as of now; Waiting = bookings already queued for it.");
+        OutputHelper.printBlue(
+                "  A stay booked for a later date is not held against these counts.");
         System.out.println("[0] Back");
         for (;;) {
             int choice = InputHelper.readInt("Room type > ");
