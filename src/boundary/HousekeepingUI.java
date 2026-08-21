@@ -18,13 +18,15 @@ import java.util.Iterator;
  */
 public class HousekeepingUI {
 
-    private static final String[] LOG_HEADERS = {"No.", "Room No", "Previous Status", "New Status"};
+    private static final String[] LOG_HEADERS = { "No.", "Room No", "Previous Status", "New Status" };
 
     private static final String TITLE = "Housekeeping and Task Log";
     private final HousekeepingControl control;
-    
-    /** Handed the control rather than building one: the undo/redo history has to
-     *  survive leaving this screen, and M2 allocates against the same rooms. */
+
+    /**
+     * Handed the control rather than building one: the undo/redo history has to
+     * survive leaving this screen, and M2 allocates against the same rooms.
+     */
     public HousekeepingUI(HousekeepingControl control) {
         this.control = control;
     }
@@ -102,17 +104,17 @@ public class HousekeepingUI {
             }
         }
 
-        String[] headers = {"Room No", "Type", "Occupancy", "Housekeeping Status"};
+        String[] headers = { "Room No", "Type", "Occupancy", "Housekeeping Status" };
         String[][] cells = new String[count][];
         int row = 0;
         for (int i = 0; i < rooms.length; i++) {
             Room r = rooms[i];
             if (r != null) {
-                cells[row++] = new String[]{
-                    r.getRoomNo(),
-                    String.valueOf(r.getRoomType()),
-                    r.getOccupancyStatus(),
-                    r.getHousekeepingStatus()
+                cells[row++] = new String[] {
+                        r.getRoomNo(),
+                        String.valueOf(r.getRoomType()),
+                        r.getOccupancyStatus(),
+                        r.getHousekeepingStatus()
                 };
             }
         }
@@ -229,7 +231,8 @@ public class HousekeepingUI {
 
     private void viewTaskLogUI() {
         OutputHelper.printBlue("\n--- Housekeeping Action History Log ---");
-        System.out.println("Stack Status: [Undo Depth: " + control.getUndoCount() + "] | [Redo Depth: " + control.getRedoCount() + "]");
+        System.out.println("Stack Status: [Undo Depth: " + control.getUndoCount() + "] | [Redo Depth: "
+                + control.getRedoCount() + "]");
 
         Iterator<HousekeepingTask> undoIt = control.getTaskLogIterator();
 
@@ -241,11 +244,11 @@ public class HousekeepingUI {
             int index = 0;
             while (undoIt.hasNext() && index < undoCells.length) {
                 HousekeepingTask t = undoIt.next();
-                undoCells[index] = new String[]{
-                    String.valueOf(index + 1),
-                    t.getRoom().getRoomNo(),
-                    t.getPreviousStatus(),
-                    t.getNewStatus()
+                undoCells[index] = new String[] {
+                        String.valueOf(index + 1),
+                        t.getRoom().getRoomNo(),
+                        t.getPreviousStatus(),
+                        t.getNewStatus()
                 };
                 index++;
             }
@@ -263,11 +266,11 @@ public class HousekeepingUI {
             while (redoIt.hasNext() && index < redoCells.length) {
                 HousekeepingTask t = redoIt.next();
                 if (t != null) {
-                    redoCells[index] = new String[]{
-                        String.valueOf(index + 1),
-                        t.getRoom().getRoomNo(),
-                        t.getPreviousStatus(),
-                        t.getNewStatus()
+                    redoCells[index] = new String[] {
+                            String.valueOf(index + 1),
+                            t.getRoom().getRoomNo(),
+                            t.getPreviousStatus(),
+                            t.getNewStatus()
                     };
                     index++;
                 }
@@ -326,25 +329,35 @@ public class HousekeepingUI {
 
         Room[] filtered = control.getFilteredSortedRooms(statusFilter, typeFilter, sortChoice);
 
+        int dirtyCount = 0;
+        int cleaningCount = 0;
+        int inspectedCount = 0;
         int readyCount = 0;
-        int pendingCount = 0;
-        String[] headers = {"Room No", "Type", "Occupancy", "Housekeeping Status"};
+
+        String[] headers = { "Room No", "Type", "Occupancy", "Housekeeping Status" };
         String[][] cells = new String[filtered.length][];
         for (int i = 0; i < filtered.length; i++) {
             Room r = filtered[i];
-            cells[i] = new String[]{
-                r.getRoomNo(),
-                String.valueOf(r.getRoomType()),
-                r.getOccupancyStatus(),
-                r.getHousekeepingStatus()
+            cells[i] = new String[] {
+                    r.getRoomNo(),
+                    String.valueOf(r.getRoomType()),
+                    r.getOccupancyStatus(),
+                    r.getHousekeepingStatus()
             };
 
-            if ("Ready for Check-In".equalsIgnoreCase(r.getHousekeepingStatus())) {
+            String status = r.getHousekeepingStatus();
+            if ("Dirty".equalsIgnoreCase(status)) {
+                dirtyCount++;
+            } else if ("Cleaning In Progress".equalsIgnoreCase(status)) {
+                cleaningCount++;
+            } else if ("Inspected".equalsIgnoreCase(status)) {
+                inspectedCount++;
+            } else if ("Ready for Check-In".equalsIgnoreCase(status)) {
                 readyCount++;
-            } else {
-                pendingCount++;
             }
         }
+
+        int pendingCount = dirtyCount + cleaningCount + inspectedCount;
 
         String[] table = TableRenderer.renderBordered(headers, cells, null);
         System.out.println();
@@ -358,9 +371,13 @@ public class HousekeepingUI {
 
         System.out.println("\n--- Summary Metrics ---");
         System.out.println("Total Matching Rooms: " + totalFiltered);
-        System.out.printf("Operational Ready Rate: %d room(s) (%.1f%%)%n", readyCount, readyPct);
-        System.out.printf("Pending Cleaning/Inspection: %d room(s) (%.1f%%)%n", pendingCount, pendingPct);
-        System.out.println("=================================================================\n");
+        System.out.printf("Operational Ready Rate: %d room(s) (%.1f%%)  %s%n", readyCount, readyPct,
+                renderProgressBar(readyPct));
+        System.out.printf("Pending Cleaning/Inspection: %d room(s) (%.1f%%)  %s%n", pendingCount, pendingPct,
+                renderProgressBar(pendingPct));
+
+        // Graphical Vertical Histogram Representation (Teacher Requirement)
+        renderReport1Graph(dirtyCount, cleaningCount, inspectedCount, readyCount);
     }
 
     private void report2UI() {
@@ -387,14 +404,14 @@ public class HousekeepingUI {
 
         HousekeepingTask[] tasks = control.getFilteredSortedTasks(zoneFilter, sortChoice);
 
-        String[] logHeaders = {"No.", "Action Event Details"};
+        String[] logHeaders = { "No.", "Action Event Details" };
         if (tasks.length == 0) {
             System.out.println();
             System.out.println("No matching housekeeping task log entries found.");
         } else {
             String[][] logCells = new String[tasks.length][];
             for (int i = 0; i < tasks.length; i++) {
-                logCells[i] = new String[]{String.valueOf(i + 1), String.valueOf(tasks[i])};
+                logCells[i] = new String[] { String.valueOf(i + 1), String.valueOf(tasks[i]) };
             }
             String[] logTable = TableRenderer.renderBordered(logHeaders, logCells, null);
             System.out.println();
@@ -407,6 +424,84 @@ public class HousekeepingUI {
         System.out.println("Total Filtered Task Events: " + tasks.length);
         System.out.println("Active Undo Stack Depth: " + control.getUndoCount());
         System.out.println("Active Redo Stack Depth: " + control.getRedoCount());
-        System.out.println("==================================================================\n");
+
+        // Graphical Vertical Histogram Representation (Teacher Requirement)
+        renderReport2Graph(tasks);
+    }
+
+    private String renderProgressBar(double percent) {
+        int width = 20;
+        int filled = (int) Math.round((percent / 100.0) * width);
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < width; i++) {
+            if (i < filled)
+                sb.append("#");
+            else
+                sb.append("-");
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private void renderReport1Graph(int dirty, int clean, int insp, int ready) {
+        System.out.println("\n" + "=".repeat(78));
+        OutputHelper.printBlue("      Report 1 Graph : ROOM READINESS & EFFICIENCY SUMMARY");
+        System.out.println("=".repeat(78));
+
+        int maxVal = Math.max(5, Math.max(dirty, Math.max(clean, Math.max(insp, ready))));
+        if (maxVal < 10)
+            maxVal = 10;
+
+        System.out.println("   Room Count");
+        System.out.println("   ^");
+        for (int level = maxVal; level >= 1; level--) {
+            System.out.printf("%2d |    %s                %s                   %s                 %s%n",
+                    level,
+                    dirty >= level ? "*" : " ",
+                    clean >= level ? "*" : " ",
+                    insp >= level ? "*" : " ",
+                    ready >= level ? "*" : " ");
+        }
+
+        System.out.println("----+--------------------------------------------------------------------> Status");
+        System.out.println("      Dirty     Cleaning In Progress     Inspected     Ready For Check-In");
+        System.out.println("=".repeat(78));
+    }
+
+    private void renderReport2Graph(HousekeepingTask[] tasks) {
+        int countA = 0, countB = 0, countC = 0;
+        for (int i = 0; i < tasks.length; i++) {
+            if (tasks[i] != null && tasks[i].getRoom() != null) {
+                String roomNo = tasks[i].getRoom().getRoomNo().toUpperCase();
+                if (roomNo.startsWith("A"))
+                    countA++;
+                else if (roomNo.startsWith("B"))
+                    countB++;
+                else if (roomNo.startsWith("C"))
+                    countC++;
+            }
+        }
+
+        System.out.println("\n" + "=".repeat(60));
+        OutputHelper.printBlue("      Report 2 Graph : TASK ACTIVITY & AUDIT TRAIL");
+        System.out.println("=".repeat(60));
+
+        int maxVal = Math.max(5, Math.max(countA, Math.max(countB, countC)));
+        if (maxVal < 10)
+            maxVal = 10;
+
+        System.out.println("   Task Count");
+        System.out.println("   ^");
+        for (int level = maxVal; level >= 1; level--) {
+            System.out.printf("%2d |      %s             %s             %s%n",
+                    level,
+                    countA >= level ? "*" : " ",
+                    countB >= level ? "*" : " ",
+                    countC >= level ? "*" : " ");
+        }
+
+        System.out.println("----+-----------------------------------------------> Zone");
+        System.out.println("        Zone A        Zone B        Zone C");
+        System.out.println("=".repeat(60));
     }
 }

@@ -20,16 +20,16 @@ public class RoomDAO {
     static {
         rooms.add(new Room("A-101", RoomType.SINGLE, "Available", "Ready for Check-In"));
         rooms.add(new Room("A-102", RoomType.SINGLE, "Available", "Ready for Check-In"));
-        rooms.add(new Room("A-103", RoomType.SINGLE, "Available", "Dirty"));
-        rooms.add(new Room("A-104", RoomType.SINGLE, "Occupied", "Cleaning In Progress"));
+        rooms.add(new Room("A-103", RoomType.SINGLE, "Available", "Ready for Check-In"));
+        rooms.add(new Room("A-104", RoomType.SINGLE, "Available", "Ready for Check-In"));
         rooms.add(new Room("A-105", RoomType.DELUXE, "Available", "Ready for Check-In"));
-        rooms.add(new Room("B-201", RoomType.DELUXE, "Available", "Inspected"));
-        rooms.add(new Room("B-202", RoomType.DELUXE, "Occupied", "Dirty"));
-        rooms.add(new Room("B-203", RoomType.DELUXE, "Available", "Dirty"));
+        rooms.add(new Room("B-201", RoomType.DELUXE, "Available", "Ready for Check-In"));
+        rooms.add(new Room("B-202", RoomType.DELUXE, "Available", "Ready for Check-In"));
+        rooms.add(new Room("B-203", RoomType.DELUXE, "Available", "Ready for Check-In"));
         rooms.add(new Room("B-204", RoomType.SUITE, "Available", "Ready for Check-In"));
-        rooms.add(new Room("C-301", RoomType.SUITE, "Available", "Dirty"));
-        rooms.add(new Room("C-302", RoomType.SUITE, "Out-of-Service", "Inspected"));
-        rooms.add(new Room("C-303", RoomType.SUITE, "Occupied", "Ready for Check-In"));
+        rooms.add(new Room("C-301", RoomType.SUITE, "Available", "Ready for Check-In"));
+        rooms.add(new Room("C-302", RoomType.SUITE, "Available", "Ready for Check-In"));
+        rooms.add(new Room("C-303", RoomType.SUITE, "Available", "Ready for Check-In"));
     }
 
     public RoomDAO() {
