@@ -759,6 +759,141 @@ public class AllocationControl {
         return total;
     }
 
+    // ================= report 1: waiting time by tier =================
+    //
+    // Every figure below is grouped by the member's tier, which the queue itself
+    // does not store - it is reached through Allocation -> Booking -> Member ->
+    // LoyaltyTier on every pass. The room figures come from M3's pool by way of
+    // the room type the booking asked for, so the report answers a question
+    // neither the queue nor the room registry can answer alone.
+
+    /** Minutes waited, averaged per tier and indexed by LoyaltyTier.ordinal(). */
+    public int[] getMeanWaitByTier() {
+        int[] total = new int[LoyaltyTier.values().length];
+        int[] count = getCountByTier();
+        Iterator<Allocation> walker = queue.getIterator();
+        while (walker.hasNext()) {
+            Allocation entry = walker.next();
+            total[entry.getTier().ordinal()] += getWaited(entry);
+        }
+        for (int i = 0; i < total.length; i++) {
+            if (count[i] > 0) {
+                total[i] /= count[i];
+            }
+        }
+        return total;
+    }
+
+    /** The worst wait in each tier - an average hides the one guest about to walk. */
+    public int[] getLongestWaitByTier() {
+        int[] longest = new int[LoyaltyTier.values().length];
+        Iterator<Allocation> walker = queue.getIterator();
+        while (walker.hasNext()) {
+            Allocation entry = walker.next();
+            int tier = entry.getTier().ordinal();
+            longest[tier] = Math.max(longest[tier], getWaited(entry));
+        }
+        return longest;
+    }
+
+    /** Entries riding a special category rather than their tier, per tier. */
+    public int[] getProtectedByTier() {
+        int[] protectedCount = new int[LoyaltyTier.values().length];
+        Iterator<Allocation> walker = queue.getIterator();
+        while (walker.hasNext()) {
+            Allocation entry = walker.next();
+            if (isCategoryProtected(entry)) {
+                protectedCount[entry.getTier().ordinal()]++;
+            }
+        }
+        return protectedCount;
+    }
+
+    /**
+     * Entries per tier whose room type has nothing ready for it right now. This is
+     * the join that makes the report worth running: a tier can be waiting a long
+     * time because the queue is unfair to it, or because the rooms it wants do not
+     * exist today, and only this column tells the two apart.
+     */
+    public int[] getBlockedByTier() {
+        int[] ready = getReadyByType();
+        int[] blocked = new int[LoyaltyTier.values().length];
+        Iterator<Allocation> walker = queue.getIterator();
+        while (walker.hasNext()) {
+            Allocation entry = walker.next();
+            if (ready[entry.getBooking().getRoomType().ordinal()] == 0) {
+                blocked[entry.getTier().ordinal()]++;
+            }
+        }
+        return blocked;
+    }
+
+    /**
+     * Where each tier sits in the serve order on average, indexed by
+     * LoyaltyTier.ordinal(). Lower is better - position 1 is served next.
+     */
+    public int[] getMeanServePositionByTier() {
+        Allocation[] order = getServeOrder();
+        int[] total = new int[LoyaltyTier.values().length];
+        int[] count = getCountByTier();
+        for (int i = 0; i < order.length; i++) {
+            total[order[i].getTier().ordinal()] += i + 1;
+        }
+        for (int i = 0; i < total.length; i++) {
+            if (count[i] > 0) {
+                total[i] /= count[i];
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Pairs of tiers where the higher one sits further back in the serve order
+     * than the lower one - the priority policy reading backwards.
+     * <p>
+     * Measured on position rather than on minutes already waited. Elapsed wait is
+     * decided by when each request happened to arrive, so a tier that joined late
+     * shows a short wait however badly the ordering treats it; position is what
+     * the policy actually sets, so it is what the policy can be judged on.
+     * <p>
+     * Tiers holding nobody are skipped, or an empty tier would read as the
+     * best-served band in the house.
+     */
+    public LoyaltyTier[][] getPriorityInversions() {
+        int[] position = getMeanServePositionByTier();
+        int[] count = getCountByTier();
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+
+        LoyaltyTier[][] buffer = new LoyaltyTier[tiers.length * tiers.length][];
+        int found = 0;
+        for (int high = 0; high < tiers.length; high++) {
+            for (int low = 0; low < high; low++) {
+                if (count[high] > 0 && count[low] > 0 && position[high] > position[low]) {
+                    // {the tier being let down, the tier going ahead of it}
+                    buffer[found++] = new LoyaltyTier[]{tiers[high], tiers[low]};
+                }
+            }
+        }
+
+        LoyaltyTier[] [] inversions = new LoyaltyTier[found][];
+        for (int i = 0; i < found; i++) {
+            inversions[i] = buffer[i];
+        }
+        return inversions;
+    }
+
+    /** How many tiers actually have somebody waiting, for the inversion denominator. */
+    public int countOccupiedTiers() {
+        int[] count = getCountByTier();
+        int occupied = 0;
+        for (int waiting : count) {
+            if (waiting > 0) {
+                occupied++;
+            }
+        }
+        return occupied;
+    }
+
     // ================= report 2: fulfilment dry-run =================
 
     /** Waiting entries per room type, indexed by RoomType.ordinal(). */

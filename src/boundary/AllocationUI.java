@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import utility.InputHelper;
 import utility.MenuItem;
 import utility.OutputHelper;
+import utility.ChartRenderer;
 import utility.TableRenderer;
 import utility.TableRenderer.Align;
 import utility.TreeRenderer;
@@ -63,8 +64,9 @@ public class AllocationUI {
         REPRIORITISE("Reprioritise Changed Tiers"),
         SEARCH("Search the Queue"),
         FILTER("Filter the Queue"),
-        STARVATION("Report: Overtake Risk"),
-        FORECAST("Report: Fulfilment Forecast");
+        STARVATION("Check Overtake Risk"),
+        TIER_WAIT("Report: Waiting Time by Tier"),
+        FORECAST("Report: Requests Waiting vs Rooms Free");
 
         private final String label;
 
@@ -129,6 +131,9 @@ public class AllocationUI {
                     break;
                 case STARVATION:
                     starvationReport();
+                    break;
+                case TIER_WAIT:
+                    tierWaitReport();
                     break;
                 case FORECAST:
                     forecastReport();
@@ -683,8 +688,9 @@ public class AllocationUI {
 
     private void printStarvation(Allocation[] rows, LoyaltyTier challenger) {
         System.out.println();
-        OutputHelper.printReportHeader("Overtake Risk Report",
-                "challenger tier = " + challenger + ", clock at " + control.getClockMinute() + " min");
+        OutputHelper.printTitle("Overtake Risk");
+        OutputHelper.printBlue("Challenger tier = " + challenger
+                + ", clock at " + control.getClockMinute() + " min");
         OutputHelper.printBlue("A " + challenger + " customer walks in at minute " + control.getClockMinute()
                 + " - who already waiting would they get in front of?");
         OutputHelper.printBlue("Waiting earns priority as it goes, so every request eventually becomes"
@@ -752,8 +758,109 @@ public class AllocationUI {
         OutputHelper.printBlue("  " + DEAD_SCORE + " = ranked on special category, which no ordinary arrival reaches");
 
         System.out.println();
+        System.out.println();
+        OutputHelper.printBlue(String.format(
+                "  %d waiting    %d exposed    %d safe", rows.length, exposed, safe));
+    }
+
+    /**
+     * What each tier is actually getting out of the priority rule. Grouping by
+     * tier is the point: the queue is ordered one entry at a time, and whether
+     * the policy works is a question about bands, not about any single entry.
+     */
+    private void tierWaitReport() {
+        if (control.isEmpty()) {
+            fail("Nobody is waiting.");
+            return;
+        }
+
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+        int[] count = control.getCountByTier();
+        int[] mean = control.getMeanWaitByTier();
+        int[] longest = control.getLongestWaitByTier();
+        int[] guarded = control.getProtectedByTier();
+        int[] blocked = control.getBlockedByTier();
+        int[] position = control.getMeanServePositionByTier();
+
+        OutputHelper.clearScreen();
+        OutputHelper.printReportHeader("Waiting Time by Tier",
+                control.size() + " waiting, clock at " + control.getClockMinute()
+                        + " min, " + control.getReadyRoomCount() + " rooms ready");
+        System.out.println();
+
+        // read off serve position, not off minutes waited: elapsed wait follows
+        // arrival times, and a tier that joined late would look well served
+        LoyaltyTier[][] outOfOrder = control.getPriorityInversions();
+        int inversions = outOfOrder.length;
+        int occupied = control.countOccupiedTiers();
+        if (occupied < 2) {
+            OutputHelper.printBlue("  >> Only one tier is waiting, so there is nothing to compare.");
+        } else if (inversions == 0) {
+            OutputHelper.printOK("  >> The queue is in the right order."
+                    + " Every tier is served before the tiers below it.");
+        } else {
+            // naming the tiers, because "2 tiers are out of order" leaves the
+            // reader to work out which two from a table they have not read yet
+            OutputHelper.printErr("  >> Served out of order: " + namePairs(outOfOrder) + ".");
+            OutputHelper.printBlue("     A lower tier is going first. Look at the SPECIAL column"
+                    + " - that is usually the reason.");
+        }
+        System.out.println();
+
+        String[] headers = {"TIER", "WAITING", "AVG PLACE", "AVG WAIT", "LONGEST",
+            "SPECIAL", "NO ROOM"};
+        Align[] aligns = {Align.LEFT, Align.RIGHT, Align.RIGHT, Align.RIGHT, Align.RIGHT,
+            Align.RIGHT, Align.RIGHT};
+        String[][] cells = new String[tiers.length][];
+        for (int i = 0; i < tiers.length; i++) {
+            cells[i] = new String[]{
+                String.valueOf(tiers[i]),
+                String.valueOf(count[i]),
+                count[i] == 0 ? "-" : String.valueOf(position[i]),
+                count[i] == 0 ? "-" : mean[i] + " min",
+                count[i] == 0 ? "-" : longest[i] + " min",
+                count[i] == 0 ? "-" : String.valueOf(guarded[i]),
+                count[i] == 0 ? "-" : String.valueOf(blocked[i])
+            };
+        }
+        String[] table = TableRenderer.render(headers, cells, aligns);
+        for (int i = 0; i < table.length; i++) {
+            System.out.println("  " + table[i]);
+        }
+
+        OutputHelper.printBlue("  AVG PLACE = where this tier sits in line on average"
+                + " (1 = served next)");
+        OutputHelper.printBlue("  SPECIAL   = jumped the line for a special reason,"
+                + " not for their tier");
+        OutputHelper.printBlue("  NO ROOM   = waiting for a room type that has none free right now");
+
+        System.out.println();
+        String[] labels = new String[tiers.length];
+        for (int i = 0; i < tiers.length; i++) {
+            labels[i] = String.valueOf(tiers[i]);
+        }
+        String[] chart = ChartRenderer.bars(labels, mean, "Mean minutes waited", "Loyalty tier", 10);
+        for (int i = 0; i < chart.length; i++) {
+            System.out.println("    " + chart[i]);
+        }
+
+        System.out.println();
         OutputHelper.printReportFooter(String.format(
-                "Records : %d waiting    Exposed : %d    Safe : %d", rows.length, exposed, safe));
+                "Tiers waiting : %d of %d    Served out of order : %d    Clock : %d min",
+                occupied, tiers.length, inversions, control.getClockMinute()));
+        InputHelper.waitForEnter();
+    }
+
+    /** "Silver waits behind Guest, and Platinum behind Gold" - named, not counted. */
+    private String namePairs(LoyaltyTier[][] pairs) {
+        StringBuilder sentence = new StringBuilder();
+        for (int i = 0; i < pairs.length; i++) {
+            if (i > 0) {
+                sentence.append(i == pairs.length - 1 ? " and " : ", ");
+            }
+            sentence.append(pairs[i][0]).append(" waits behind ").append(pairs[i][1]);
+        }
+        return sentence.toString();
     }
 
     private void forecastReport() {
@@ -763,7 +870,7 @@ public class AllocationUI {
         }
 
         int lookAhead = InputHelper.readInt(
-                "\nLook ahead how many serves (0 = until the queue stalls) > ");
+                "\nHow many requests should we try to fill? (0 = as many as we can) > ");
         if (lookAhead < 0) {
             fail("Look-ahead cannot be negative.");
             return;
@@ -775,26 +882,27 @@ public class AllocationUI {
 
     private void printForecast(Forecast forecast, int lookAhead) {
         System.out.println();
-        OutputHelper.printReportHeader("Fulfilment Forecast Report",
-                "look-ahead = " + (lookAhead == 0 ? "whole queue (" + forecast.getQueued() + " waiting)"
-                        : lookAhead + " serves")
-                        + ", rooms ready = " + control.getReadyRoomCount());
+        OutputHelper.printReportHeader("Requests Waiting vs Rooms Free",
+                (lookAhead == 0 ? "the whole queue (" + forecast.getQueued() + " waiting)"
+                        : "the next " + lookAhead + " in the queue")
+                        + ", " + control.getReadyRoomCount() + " rooms ready");
         System.out.println();
 
         Allocation blocker = forecast.getBlocker();
         if (blocker == null) {
-            OutputHelper.printOK(String.format("  Served    : %d of %d - the look-ahead clears with no stall",
-                    forecast.getServed(), forecast.getQueued()));
+            OutputHelper.printOK(String.format(
+                    "  >> All %d waiting %s can be given a room right now.",
+                    forecast.getServed(), forecast.getServed() == 1 ? "request" : "requests"));
         } else {
-            OutputHelper.printOK(String.format("  Served    : %d of %d before the queue stalls",
-                    forecast.getServed(), forecast.getQueued()));
-            OutputHelper.printErr(String.format("  Stalls at : #%d %s - wants %s, and no upgrade is free either",
-                    blocker.getEntryNo(),
+            OutputHelper.printErr(String.format(
+                    "  >> Only %d of %d can be given a room. We run out at #%d %s,"
+                            + " who wants a %s.",
+                    forecast.getServed(), forecast.getQueued(), blocker.getEntryNo(),
                     blocker.getBooking().getMember().getName(),
                     blocker.getBooking().getRoomType()));
-            System.out.printf("  Blocked   : %d %s behind it%n",
+            System.out.printf("     %d %s stuck behind that one, even where a room is free.%n",
                     forecast.getBlocked(),
-                    forecast.getBlocked() == 1 ? "entry sits" : "entries sit");
+                    forecast.getBlocked() == 1 ? "request is" : "requests are");
         }
 
         System.out.println();
@@ -802,7 +910,7 @@ public class AllocationUI {
         int[] waiting = forecast.getWaitingByType();
         int[] ready = forecast.getReadyByType();
 
-        String[] headers = {"Type", "Waiting", "Ready", "Gap"};
+        String[] headers = {"ROOM TYPE", "WAITING", "READY", "SPARE"};
         Align[] aligns = {Align.LEFT, Align.RIGHT, Align.RIGHT, Align.RIGHT};
         String[][] cells = new String[types.length][];
         boolean[] short_ = new boolean[types.length];
@@ -826,29 +934,43 @@ public class AllocationUI {
                 System.out.println("  " + table[i]);
             }
         }
-        OutputHelper.printBlue("  Gap = ready rooms minus requests waiting for them; a negative gap"
-                + " is a shortage, and is what stalls the queue.");
+        OutputHelper.printBlue("  SPARE = rooms left over once everyone waiting for that type"
+                + " has one; a minus number is how many we are short.");
 
         System.out.println();
-        System.out.printf("  Upgrades  : %d, giving away RM %,.2f%n",
+        System.out.printf("  Free upgrades : %d, costing RM %,.2f%n",
                 forecast.getUpgrades(), forecast.getUpgradeCost());
-        OutputHelper.printBlue("  An upgrade is a request served in a dearer room because its own type"
-                + " had run out; the money is the rate difference the resort absorbs.");
+        OutputHelper.printBlue("  A guest whose own room type ran out is put in a dearer room instead."
+                + " The resort pays the difference in rate.");
 
         if (blocker != null) {
             Room releasable = forecast.getReleasable();
-            OutputHelper.printBlue(String.format("  Unblock   : one more ready %s serves %d more; %s",
+            OutputHelper.printBlue(String.format(
+                    "  One more %s ready would serve %d more %s. %s",
                     blocker.getBooking().getRoomType(),
                     forecast.getUnblockGain(),
+                    forecast.getUnblockGain() == 1 ? "guest" : "guests",
                     releasable == null
-                            ? "none is vacant, so this waits on a checkout"
-                            : "room " + releasable.getRoomNo() + " is vacant and only needs cleaning ("
-                                    + releasable.getHousekeepingStatus() + ")"));
+                            ? "None is empty, so this has to wait for a check-out."
+                            : "Room " + releasable.getRoomNo() + " is empty and only needs cleaning ("
+                                    + releasable.getHousekeepingStatus() + ")."));
+        }
+
+        String[] typeLabels = new String[RoomType.values().length];
+        for (int i = 0; i < typeLabels.length; i++) {
+            typeLabels[i] = String.valueOf(RoomType.values()[i]);
+        }
+        System.out.println();
+        String[] chart = ChartRenderer.groupedBars(typeLabels,
+                forecast.getWaitingByType(), forecast.getReadyByType(),
+                new String[]{"Waiting", "Ready"}, "Number of requests / rooms", "Room type", 8);
+        for (int i = 0; i < chart.length; i++) {
+            System.out.println("    " + chart[i]);
         }
 
         System.out.println();
         OutputHelper.printReportFooter(String.format(
-                "Records : %d waiting    Served : %d    Blocked : %d    Upgrades : %d (RM %,.2f)",
+                "Waiting : %d    Would get a room : %d    Stuck behind : %d    Upgrades : %d (RM %,.2f)",
                 forecast.getQueued(), forecast.getServed(), forecast.getBlocked(),
                 forecast.getUpgrades(), forecast.getUpgradeCost()));
     }
