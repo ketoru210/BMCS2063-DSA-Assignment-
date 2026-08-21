@@ -255,16 +255,26 @@ public class BookingControl {
 
     // ---- desk operations ----
 
-    public Booking createWalkIn(String guestName, RoomType roomType, int nights){
-        if(guestName == null || guestName.isEmpty() || nights < 1){
+    /**
+     * The walk-in standing at the counter, as a Member the rest of the desk can
+     * treat like any other. Built once per visit rather than once per room, so a
+     * party of three shares one guest record instead of splitting into three
+     * strangers who happen to have the same name.
+     * <p>
+     * GUEST, not the constructor's default of SILVER: a walk-in has not joined the
+     * programme, and M2 would otherwise hand them 30 minutes of priority.
+     */
+    public Member createGuest(String guestName){
+        if(guestName == null || guestName.isEmpty()){
             return null;
         }
-        // GUEST, not the constructor's default of SILVER: a walk-in has not joined
-        // the programme, and M2 would otherwise hand them 30 minutes of priority
-        Member guest = new Member(guestName.toLowerCase().replace(" ",""), "walkin", guestName,
+        return new Member(guestName.toLowerCase().replace(" ",""), "walkin", guestName,
                 LoyaltyTier.GUEST);
-        LocalDate checkIn = LocalDate.now();
-        return createBooking(guest, roomType, checkIn, checkIn.plusDays(nights));
+    }
+
+    /** A walk-in has no programme record, so the tier is what marks them out. */
+    public boolean isWalkIn(Member member){
+        return member != null && member.getCurrentTier() == LoyaltyTier.GUEST;
     }
 
     /**
@@ -293,6 +303,41 @@ public class BookingControl {
 
     private String nextConfirmationNo(){
         return String.valueOf(FIRST_CONFIRMATION_NO + random.nextInt(CONFIRMATION_NO_RANGE));
+    }
+
+    /**
+     * The same stay taken N times, because a member ringing the desk books for a
+     * party and the model carries one room per booking. Each room gets its own
+     * confirmation number so it can be checked in, moved or cancelled on its own -
+     * a party that arrives on two flights would otherwise be stuck together.
+     */
+    public Booking[] createBookings(Member member, RoomType roomType, LocalDate checkIn,
+            LocalDate checkOut, int rooms){
+        if(rooms < 1){
+            return new Booking[0];
+        }
+        Booking[] made = new Booking[rooms];
+        for(int i = 0; i < rooms; i++){
+            made[i] = createBooking(member, roomType, checkIn, checkOut);
+            if(made[i] == null){
+                // the details were bad, so none of the rest would fare any better
+                Booking[] partial = new Booking[i];
+                for(int j = 0; j < i; j++){
+                    partial[j] = made[j];
+                }
+                return partial;
+            }
+        }
+        return made;
+    }
+
+    /** Rooms a batch asks for per room type, indexed by RoomType.ordinal(). */
+    public int[] roomsByType(Booking[] batch){
+        int[] rooms = new int[RoomType.values().length];
+        for(Booking booking : batch){
+            rooms[booking.getRoomType().ordinal()]++;
+        }
+        return rooms;
     }
 
     /**

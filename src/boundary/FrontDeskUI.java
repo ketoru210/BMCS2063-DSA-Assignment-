@@ -29,6 +29,8 @@ public class FrontDeskUI {
 
     private static final String TITLE = "Front-Desk Service";
     private static final int TREE_GAP = 2;
+    // a party larger than this is a group booking, which the desk handles off-system
+    private static final int MAX_ROOMS_PER_REQUEST = 10;
     private static final DateTimeFormatter STAY_DATE = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final BookingControl control;
@@ -41,8 +43,7 @@ public class FrontDeskUI {
 
     private enum MenuOption implements MenuItem {
         BACK("Back to Main Menu"),
-        NEW_BOOKING("New Walk-in Booking"),
-        MEMBER_BOOKING("New Booking for a Member"),
+        NEW_BOOKING("New Booking"),
         LOOK_UP("Look Up Booking"),
         LIST("View All Bookings"),
         CHECK_IN("Check-in Guest"),
@@ -77,10 +78,7 @@ public class FrontDeskUI {
                 case BACK:
                     return;
                 case NEW_BOOKING:
-                    newWalkIn();
-                    break;
-                case MEMBER_BOOKING:
-                    newMemberBooking();
+                    newBooking();
                     break;
                 case LOOK_UP:
                     lookUp();
@@ -161,67 +159,62 @@ public class FrontDeskUI {
         System.out.println();
     }
 
-    private void newWalkIn() {
-        for (;;) {
-            String name = InputHelper.readLine("\nCustomer name (0 = back) > ");
-            if (name.equals("0")) {
-                return;
-            }
-            if (name.isEmpty()) {
-                OutputHelper.printErr("Customer name is required.");
-                continue;
-            }
-
-            RoomType roomType = readRoomType();
-            if (roomType == null) {
-                // a sub-step back only restarts the booking, it does not leave
-                continue;
-            }
-
-            int nights = InputHelper.readInt("Nights > ");
-            Booking booking = control.createWalkIn(name, roomType, nights);
-            if (booking == null) {
-                OutputHelper.printErr("Nights must be at least 1.");
-                continue;
-            }
-            notice = "Booked. Confirmation no. " + booking.getConfirmationNo()
-                    + " (" + money(control.revenueOf(booking)) + ")";
-            OutputHelper.printOK(notice);
-        }
-    }
-
     /**
-     * The desk booking a member in, which a walk-in cannot cover: the stay may
-     * start on a future date, and the member keeps the tier M2 will queue them on
-     * instead of being admitted as an unranked guest.
+     * One door for both kinds of booking. They differ in exactly one place - a
+     * member may name a future date, a walk-in is at the counter and so starts
+     * today - and that is not enough to justify two screens the desk has to choose
+     * between before knowing which one the caller is.
      * <p>
-     * Walked through as numbered steps because the screen would otherwise put a
-     * rate table straight under the member's booking history with nothing saying
-     * what is being asked for.
+     * Whoever is booking is asked for once and then held, because a caller books
+     * for a party rather than for one bed: each round through the loop adds
+     * another request, and the batch is receipted together at the end.
      */
-    private void newMemberBooking() {
-        for (;;) {
-            OutputHelper.clearScreen();
-            OutputHelper.printTitle("New Booking for a Member");
+    private void newBooking() {
+        OutputHelper.clearScreen();
+        OutputHelper.printTitle("New Booking");
 
-            step(1, "Find the member");
-            Member member = pickMember();
-            if (member == null) {
-                return;
+        step(1, "Who is booking?");
+        Member member = pickGuest();
+        if (member == null) {
+            return;
+        }
+        printMemberCard(member);
+
+        Booking[] batch = new Booking[0];
+        // lines, not rooms: one line can be three rooms of the same type
+        int requests = 0;
+
+        for (;;) {
+            System.out.println();
+            OutputHelper.printBlue("== Line " + (requests + 1)
+                    + " for " + member.getName() + " ==");
+            if (requests == 0) {
+                System.out.println("A line is one room type over one set of dates."
+                        + " Add as many lines as the party needs.");
             }
-            printMemberCard(member);
 
             step(2, "Choose a room type");
             RoomType roomType = readRoomType();
             if (roomType == null) {
-                // a sub-step back only restarts the booking, it does not leave
+                // backing out of the type is how the desk says the party is complete
+                break;
+            }
+            int rooms = readRooms(roomType);
+            if (rooms == 0) {
                 continue;
             }
 
             step(3, "Set the stay dates");
-            LocalDate checkIn = readDate("Check-in date (dd-MM-yyyy, blank = today, 0 = back) > ");
-            if (checkIn == null) {
-                continue;
+            LocalDate checkIn;
+            if (control.isWalkIn(member)) {
+                checkIn = LocalDate.now();
+                System.out.println("Check-in date : " + checkIn.format(STAY_DATE)
+                        + "  (a walk-in is at the counter, so the stay starts today)");
+            } else {
+                checkIn = readDate("Check-in date (dd-MM-yyyy, blank = today, 0 = back) > ");
+                if (checkIn == null) {
+                    continue;
+                }
             }
             int nights = readNights();
             if (nights == 0) {
@@ -229,58 +222,167 @@ public class FrontDeskUI {
             }
             LocalDate checkOut = checkIn.plusDays(nights);
 
-            Booking clash = control.findClashingStay(member, checkIn, checkOut);
-            if (clash != null) {
-                OutputHelper.printErr(member.getName() + " is already booked over those dates: "
-                        + clash.getConfirmationNo() + " (" + clash.getCheckIn().format(STAY_DATE)
-                        + " - " + clash.getCheckOut().format(STAY_DATE) + ", " + clash.getStatus() + ").");
-                InputHelper.waitForEnter();
+            // a walk-in record is minutes old, so any overlap it has is this very
+            // party being built up room by room - there is nothing to warn about
+            if (!control.isWalkIn(member) && !overlapAccepted(member, checkIn, checkOut)) {
                 continue;
             }
 
             step(4, "Confirm");
-            double charge = roomType.getRatePerNight() * nights;
-            System.out.println("  Member    : " + member.getMemberID() + "  " + member.getName()
-                    + "  (" + member.getCurrentTier() + ")");
-            System.out.println("  Room type : " + roomType + "  at "
-                    + money(roomType.getRatePerNight()) + " / night");
-            System.out.println("  Stay      : " + checkIn.format(STAY_DATE) + " to "
-                    + checkOut.format(STAY_DATE) + "  (" + nights + " night"
-                    + (nights == 1 ? "" : "s") + ")");
-            System.out.println("  Charge    : " + money(charge));
-            System.out.println();
-
-            String answer = InputHelper.readLine("Confirm this booking? [y/N] > ");
-            if (!answer.equalsIgnoreCase("y")) {
-                OutputHelper.printErr("Booking abandoned.");
-                InputHelper.waitForEnter();
+            if (!confirmLine(member, roomType, checkIn, checkOut, nights, rooms)) {
                 continue;
             }
 
-            Booking booking = control.createBooking(member, roomType, checkIn, checkOut);
-            if (booking == null) {
+            Booking[] made = control.createBookings(member, roomType, checkIn, checkOut, rooms);
+            if (made.length == 0) {
                 OutputHelper.printErr("Could not create the booking with those details.");
                 InputHelper.waitForEnter();
                 continue;
             }
-            notice = "Booked " + member.getName() + ". Confirmation no. "
-                    + booking.getConfirmationNo() + " (" + money(control.revenueOf(booking))
-                    + "). It now waits for a room in VIP & Loyalty Tier-Priority Room Allocation.";
+            batch = append(batch, made);
+            requests++;
+
+            OutputHelper.printOK("Added " + made.length + " booking"
+                    + (made.length == 1 ? "" : "s") + ". " + batch.length + " so far.");
+            String more = InputHelper.readLine("Add another line - a different room type"
+                    + " or different dates - for " + member.getName() + "? [y/N] > ");
+            if (!more.equalsIgnoreCase("y")) {
+                break;
+            }
+        }
+
+        if (batch.length == 0) {
+            notice = "No booking was made for " + member.getName() + ".";
             return;
         }
+        printBatchReceipt(member, batch);
+        notice = "Booked " + batch.length + " room" + (batch.length == 1 ? "" : "s") + " for "
+                + member.getName() + " (" + money(control.totalRevenueOf(batch))
+                + "). They now wait for rooms in VIP & Loyalty Tier-Priority Room Allocation.";
+    }
+
+    /**
+     * An overlapping stay is a warning and not a refusal: a member booking for a
+     * party legitimately holds several rooms over the same nights, and only the
+     * desk can tell that apart from the same booking being taken down twice.
+     */
+    private boolean overlapAccepted(Member member, LocalDate checkIn, LocalDate checkOut) {
+        Booking clash = control.findClashingStay(member, checkIn, checkOut);
+        if (clash == null) {
+            return true;
+        }
+        OutputHelper.printBlue(member.getName() + " already holds "
+                + clash.getConfirmationNo() + " over those nights ("
+                + clash.getCheckIn().format(STAY_DATE) + " - "
+                + clash.getCheckOut().format(STAY_DATE) + ", " + clash.getStatus()
+                + "). Normal for a party, a mistake if the stay was taken down twice.");
+        return InputHelper.readLine("Book it anyway? [y/N] > ").equalsIgnoreCase("y");
+    }
+
+    private boolean confirmLine(Member member, RoomType roomType, LocalDate checkIn,
+            LocalDate checkOut, int nights, int rooms) {
+        double perRoom = roomType.getRatePerNight() * nights;
+        System.out.println("  Booked by : " + member.getName()
+                + (control.isWalkIn(member)
+                        ? "  (walk-in guest)"
+                        : "  (" + member.getMemberID() + ", " + member.getCurrentTier() + ")"));
+        System.out.println("  Room type : " + roomType + "  at "
+                + money(roomType.getRatePerNight()) + " / night");
+        System.out.println("  Rooms     : " + rooms);
+        System.out.println("  Stay      : " + checkIn.format(STAY_DATE) + " to "
+                + checkOut.format(STAY_DATE) + "  (" + nights + " night"
+                + (nights == 1 ? "" : "s") + ")");
+        System.out.println("  Charge    : " + money(perRoom * rooms)
+                + (rooms == 1 ? "" : "   (" + money(perRoom) + " per room)"));
+        System.out.println();
+
+        if (InputHelper.readLine("Confirm this line? [y/N] > ").equalsIgnoreCase("y")) {
+            return true;
+        }
+        OutputHelper.printErr("Line abandoned.");
+        return false;
+    }
+
+    /**
+     * What the whole visit produced, and what it did to the room pool: a party of
+     * four suites against one ready suite is the desk's problem now, not a surprise
+     * for whoever runs the allocation queue later.
+     */
+    private void printBatchReceipt(Member member, Booking[] batch) {
+        OutputHelper.clearScreen();
+        OutputHelper.printReportHeader("Booking Receipt",
+                (control.isWalkIn(member) ? "walk-in " : member.getMemberID() + " ")
+                        + member.getName() + ", " + batch.length
+                        + " room" + (batch.length == 1 ? "" : "s"));
+        System.out.println();
+        printBookings(null, batch);
+
+        RoomType[] types = RoomType.values();
+        int[] booked = control.roomsByType(batch);
+        int[] ready = control.readyByType();
+        int[] waiting = control.waitingByType();
+
+        System.out.println();
+        System.out.println("  Pressure on the room pool");
+        String[] headers = {"ROOM TYPE", "BOOKED", "READY NOW", "ALREADY QUEUED", "CHASING 1 ROOM"};
+        Align[] aligns = {Align.LEFT, Align.RIGHT, Align.RIGHT, Align.RIGHT, Align.RIGHT};
+        String[][] cells = new String[types.length][];
+        for (int i = 0; i < types.length; i++) {
+            // a new booking is only a candidate for M2's queue, not yet in it, so
+            // the batch is pressure on top of whatever is already queued
+            int chasing = booked[i] + waiting[i];
+            cells[i] = new String[]{
+                String.valueOf(types[i]),
+                String.valueOf(booked[i]),
+                String.valueOf(ready[i]),
+                String.valueOf(waiting[i]),
+                ready[i] == 0 ? (chasing == 0 ? "-" : "no room")
+                        : String.format("%.1f", (double) chasing / ready[i])
+            };
+        }
+        String[] table = TableRenderer.render(headers, cells, aligns);
+        for (int i = 0; i < table.length; i++) {
+            System.out.println("    " + table[i]);
+        }
+
+        System.out.println();
+        OutputHelper.printReportFooter(String.format(
+                "Rooms : %d    Total charge : %s    Average : %s per room",
+                batch.length, money(control.totalRevenueOf(batch)),
+                money(control.totalRevenueOf(batch) / batch.length)));
+        InputHelper.waitForEnter();
+    }
+
+    /** Grown by copying because the batch has no known size until the desk stops. */
+    private Booking[] append(Booking[] batch, Booking[] more) {
+        Booking[] grown = new Booking[batch.length + more.length];
+        for (int i = 0; i < batch.length; i++) {
+            grown[i] = batch[i];
+        }
+        for (int i = 0; i < more.length; i++) {
+            grown[batch.length + i] = more[i];
+        }
+        return grown;
     }
 
     private void step(int number, String title) {
         System.out.println();
-        OutputHelper.printBlue("-- Step " + number + " of 4 : " + title + " --");
+        OutputHelper.printBlue("-- Step " + number + " : " + title + " --");
     }
 
     /** Who the desk has landed on, and what the registry already holds for them. */
     private void printMemberCard(Member member) {
         System.out.println();
-        OutputHelper.printOK("Booking for " + member.getMemberID() + "  " + member.getName()
-                + "  (" + member.getCurrentTier() + ", " + member.getCurrentPoints() + " pts)");
+        OutputHelper.printOK("Booking for " + member.getName() + "  "
+                + (control.isWalkIn(member)
+                        ? "(walk-in guest, no membership)"
+                        : "(" + member.getMemberID() + ", " + member.getCurrentTier()
+                                + ", " + member.getCurrentPoints() + " pts)"));
 
+        if (control.isWalkIn(member)) {
+            // the record was made a second ago, so there is no history to show
+            return;
+        }
         Booking[] onFile = control.bookingsOf(member);
         if (onFile.length == 0) {
             System.out.println("No booking on file for this member yet.");
@@ -289,6 +391,43 @@ public class FrontDeskUI {
         System.out.println(onFile.length + " booking" + (onFile.length == 1 ? "" : "s")
                 + " already on file:");
         printBookings(null, onFile);
+    }
+
+    /**
+     * Whoever the booking is for, member or not. Null means the user backed out.
+     */
+    private Member pickGuest() {
+        System.out.println("[0] Back");
+        System.out.println("[1] Existing member");
+        System.out.println("[2] Walk-in guest");
+        for (;;) {
+            int pick = InputHelper.readInt("Please Select > ");
+            if (pick == 0) {
+                return null;
+            }
+            if (pick == 1) {
+                return pickMember();
+            }
+            if (pick == 2) {
+                return readGuest();
+            }
+            OutputHelper.printErr("Please enter 0, 1 or 2.");
+        }
+    }
+
+    /** Null means the user backed out. */
+    private Member readGuest() {
+        for (;;) {
+            String name = InputHelper.readLine("Guest name (0 = back) > ");
+            if (name.equals("0")) {
+                return null;
+            }
+            Member guest = control.createGuest(name);
+            if (guest != null) {
+                return guest;
+            }
+            OutputHelper.printErr("Guest name is required.");
+        }
     }
 
     /** Null means the user backed out. */
@@ -347,6 +486,21 @@ public class FrontDeskUI {
         String[] table = TableRenderer.renderBordered(headers, cells, aligns);
         for (int i = 0; i < table.length; i++) {
             System.out.println(table[i]);
+        }
+    }
+
+    /** 0 means the user backed out. */
+    private int readRooms(RoomType roomType) {
+        for (;;) {
+            int rooms = InputHelper.readInt("How many " + roomType + " rooms? (0 = back) > ");
+            if (rooms == 0) {
+                return 0;
+            }
+            if (rooms >= 1 && rooms <= MAX_ROOMS_PER_REQUEST) {
+                return rooms;
+            }
+            OutputHelper.printErr("Enter between 1 and " + MAX_ROOMS_PER_REQUEST
+                    + " rooms, or 0 to go back.");
         }
     }
 
