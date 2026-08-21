@@ -1374,9 +1374,9 @@ public class LoyaltyUI {
         OutputHelper.printOptions(new String[]{"Back", "Silver", "Gold", "Platinum"});
         int choice = InputHelper.readInt("Select Tier: ");
         return switch (choice) {
-            case 2 -> LoyaltyTier.SILVER;
-            case 3 -> LoyaltyTier.GOLD;
-            case 4 -> LoyaltyTier.PLATINUM;
+            case 1 -> LoyaltyTier.SILVER;
+            case 2 -> LoyaltyTier.GOLD;
+            case 3 -> LoyaltyTier.PLATINUM;
             default -> LoyaltyTier.GUEST;
         };
     }
@@ -1566,8 +1566,7 @@ public class LoyaltyUI {
                 Member m = members[i];
                 String marker = (i == highlight) ? "-> " : "";
                 cells[i] = new String[]{
-                        marker + m.getMemberID(), m.getName(), m.getUsername(),
-                        String.valueOf(m.getCurrentTier()), String.valueOf(m.getSeasonalPoints())
+                        marker + m.getMemberID(), m.getName(), m.getUsername(), String.valueOf(m.getCurrentTier()), String.valueOf(m.getSeasonalPoints())
                 };
                 switch (m.getCurrentTier()) {
                     case SILVER: silverCount++; silverSum += m.getSeasonalPoints(); break;
@@ -1581,10 +1580,20 @@ public class LoyaltyUI {
             if (highlight == -1 && !searchUsername.isBlank()) {
                 System.out.println("\n(Username '" + searchUsername + "' not found in this filtered result.)");
             }
-            String summary = String.format("Silver: %d (avg %.1f pts) | Gold: %d (avg %.1f pts) | Platinum: %d (avg %.1f pts)",
-                    silverCount, silverCount == 0 ? 0 : (double) silverSum / silverCount,
-                    goldCount, goldCount == 0 ? 0 : (double) goldSum / goldCount,
-                    platinumCount, platinumCount == 0 ? 0 : (double) platinumSum / platinumCount);
+            String summary;
+            if (filterTier == null) {
+                summary = String.format("Silver: %d (avg %.1f pts) | Gold: %d (avg %.1f pts) | Platinum: %d (avg %.1f pts)",
+                        silverCount, silverCount == 0 ? 0 : (double) silverSum / silverCount,
+                        goldCount, goldCount == 0 ? 0 : (double) goldSum / goldCount,
+                        platinumCount, platinumCount == 0 ? 0 : (double) platinumSum / platinumCount);
+            } else {
+                int count = members.length;
+                long sum = 0;
+                for (Member m : members) {
+                    sum += m.getSeasonalPoints();
+                }
+                summary = String.format("%s: %d member(s) (avg %.1f pts)", filterTier, count, count == 0 ? 0 : (double) sum / count);
+            }
             OutputHelper.printReportFooter(summary);
         }
         InputHelper.waitForEnter();
@@ -1620,9 +1629,27 @@ public class LoyaltyUI {
             }
             print(TableRenderer.renderBordered(new String[]{"Reward", "Times Redeemed", "Total Points Spent"},
                     cells, new Align[]{Align.LEFT, Align.RIGHT, Align.RIGHT}));
+            int totalMetric = sortByCount ? totalRedemptions : totalPoints;
+            String[] names = new String[stats.length];
+            double[] percentages = new double[stats.length];
+            for (int i = 0; i < stats.length; i++) {
+                names[i] = stats[i].getLabel();
+                int metric = sortByCount ? stats[i].getCount() : stats[i].getTotalPoints();
+                percentages[i] = totalMetric == 0 ? 0 : (metric * 100.0) / totalMetric;
+            }
+            printBarChart("Horizontal bar chart sorted by " + (sortByCount ? "Redemption Count" : "Points Spent") + ":", names, percentages);
             String summary = "Total redemptions: " + totalRedemptions + " | Total points spent: " + totalPoints + " | Most popular: " + stats[0].getLabel();
             OutputHelper.printReportFooter(summary);
         }
         InputHelper.waitForEnter();
+    }
+    private void printBarChart(String heading, String[] names, double[] percentages) {
+        System.out.println("\n" + heading);
+        int barWidth = 20;
+        for (int i = 0; i < names.length; i++) {
+            int filled = (int) Math.round(percentages[i] / 100.0 * barWidth);
+            String bar = "#".repeat(Math.max(0, filled)) + "-".repeat(Math.max(0, barWidth - filled));
+            System.out.printf("%-24s [%s] %5.1f%%%n", names[i], bar, percentages[i]);
+        }
     }
 }
