@@ -3,6 +3,7 @@ package boundary;
 import control.BookingControl;
 import control.BookingControl.SortKey;
 import entity.Booking;
+import entity.LoyaltyTier;
 import entity.Member;
 import entity.RoomType;
 import java.time.LocalDate;
@@ -11,6 +12,7 @@ import java.time.format.DateTimeParseException;
 import utility.InputHelper;
 import utility.MenuItem;
 import utility.OutputHelper;
+import utility.ChartRenderer;
 import utility.TableRenderer;
 import utility.TableRenderer.Align;
 import utility.TreeRenderer;
@@ -31,6 +33,7 @@ public class FrontDeskUI {
     private static final int TREE_GAP = 2;
     // a party larger than this is a group booking, which the desk handles off-system
     private static final int MAX_ROOMS_PER_REQUEST = 10;
+    private static final int MAX_LOOKAHEAD_DAYS = 30;
     private static final DateTimeFormatter STAY_DATE = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final BookingControl control;
@@ -50,8 +53,9 @@ public class FrontDeskUI {
         CHECK_OUT("Check-out Guest"),
         CANCEL("Cancel Booking"),
         PURGE("Purge Cancelled Bookings"),
-        HEALTH("Tree Health Report"),
-        RANGE("Confirmation Range Audit");
+        HEALTH("Inspect Tree Balance"),
+        ARRIVALS("Report: Guests Arriving vs Rooms Ready"),
+        RANGE("Report: Bookings and Money by Number Range");
 
         private final String label;
 
@@ -99,7 +103,10 @@ public class FrontDeskUI {
                     purge();
                     break;
                 case HEALTH:
-                    treeHealthReport();
+                    inspectTree();
+                    break;
+                case ARRIVALS:
+                    arrivalReadinessReport();
                     break;
                 case RANGE:
                     rangeAudit();
@@ -787,9 +794,13 @@ public class FrontDeskUI {
                         + ", tree height " + heightBefore + " -> " + control.getTreeHeight() + ".";
     }
 
-    private void treeHealthReport() {
+    /**
+     * A look at the shape of the registry rather than at its contents - how far
+     * the tree has drifted from balanced, and what that costs a lookup.
+     */
+    private void inspectTree() {
         OutputHelper.clearScreen();
-        OutputHelper.printReportHeader("Tree Health Report", "every booking on file");
+        OutputHelper.printTitle("Tree Balance");
         System.out.println();
 
         int size = control.size();
@@ -824,14 +835,150 @@ public class FrontDeskUI {
         }
 
         System.out.println();
-        OutputHelper.printReportFooter(String.format(
-                "Records : %d    Height : %d of %d optimal    Degeneracy : %.1f%%",
+        OutputHelper.printBlue(String.format(
+                "  %d records    height %d of %d optimal    degeneracy %.1f%%",
                 size, height, optimal, degeneracy));
         InputHelper.waitForEnter();
     }
 
+    /**
+     * Whether the guests due in can actually be housed. The arrivals come off the
+     * registry, the tier off each booking's member, and the supply off the room
+     * pool - three places, one question, which is what makes it a report rather
+     * than another listing of bookings.
+     */
+    private void arrivalReadinessReport() {
+        OutputHelper.printTitle("Guests Arriving vs Rooms Ready");
+        int days = InputHelper.readInt("\nLook ahead how many days (0 = back) > ");
+        if (days == 0) {
+            return;
+        }
+        if (days < 0 || days > MAX_LOOKAHEAD_DAYS) {
+            OutputHelper.printErr("Enter between 1 and " + MAX_LOOKAHEAD_DAYS + " days.");
+            InputHelper.waitForEnter();
+            return;
+        }
+
+        Booking[] arrivals = control.arrivalsWithin(days);
+        if (arrivals.length == 0) {
+            System.out.println();
+            OutputHelper.printErr("No confirmed arrival is due in the next " + days
+                    + (days == 1 ? " day." : " days."));
+            InputHelper.waitForEnter();
+            return;
+        }
+
+        RoomType[] types = RoomType.values();
+        int[] wanted = control.roomsByType(arrivals);
+        int[] ready = control.readyByType();
+        Booking[] stranded = control.unhoused(arrivals);
+
+        OutputHelper.clearScreen();
+        OutputHelper.printReportHeader("Guests Arriving vs Rooms Ready",
+                "check-in within " + days + (days == 1 ? " day" : " days")
+                        + ", " + arrivals.length + " confirmed arrival"
+                        + (arrivals.length == 1 ? "" : "s"));
+        System.out.println();
+
+        if (stranded.length == 0) {
+            OutputHelper.printOK("  >> Every one of the " + arrivals.length
+                    + " guests due in has a room of the type they booked.");
+        } else {
+            OutputHelper.printErr("  >> " + stranded.length + " of the " + arrivals.length
+                    + " guests due in have no room of the type they booked.");
+            OutputHelper.printBlue("     " + shortfallLine(types, wanted, ready));
+        }
+        System.out.println();
+
+        String[] headers = {"ROOM TYPE", "ARRIVING", "READY", "SHORT BY"};
+        Align[] aligns = {Align.LEFT, Align.RIGHT, Align.RIGHT, Align.RIGHT};
+        String[][] cells = new String[types.length][];
+        String[] labels = new String[types.length];
+        for (int i = 0; i < types.length; i++) {
+            int gap = wanted[i] - ready[i];
+            labels[i] = String.valueOf(types[i]);
+            cells[i] = new String[]{
+                labels[i],
+                String.valueOf(wanted[i]),
+                String.valueOf(ready[i]),
+                gap > 0 ? String.valueOf(gap) : "-"
+            };
+        }
+        String[] table = TableRenderer.render(headers, cells, aligns);
+        for (int i = 0; i < table.length; i++) {
+            System.out.println("  " + table[i]);
+        }
+        OutputHelper.printBlue("  READY    = free and cleaned right now, ready to hand over");
+        OutputHelper.printBlue("  SHORT BY = how many more of that type we would need today");
+
+        System.out.println();
+        String[] chart = ChartRenderer.groupedBars(labels, wanted, ready,
+                new String[]{"Arriving", "Ready"}, "Number of rooms", "Room type", 8);
+        for (int i = 0; i < chart.length; i++) {
+            System.out.println("    " + chart[i]);
+        }
+
+        System.out.println();
+        System.out.println("  Arrivals by tier");
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+        int[] byTier = control.countByTier(arrivals);
+        String[] tierHeaders = {"TIER", "ARRIVING", "SHARE"};
+        Align[] tierAligns = {Align.LEFT, Align.RIGHT, Align.RIGHT};
+        String[][] tierCells = new String[tiers.length][];
+        for (int i = 0; i < tiers.length; i++) {
+            tierCells[i] = new String[]{
+                String.valueOf(tiers[i]),
+                String.valueOf(byTier[i]),
+                String.format("%.0f%%", byTier[i] * 100.0 / arrivals.length)
+            };
+        }
+        String[] tierTable = TableRenderer.render(tierHeaders, tierCells, tierAligns);
+        for (int i = 1; i < tierTable.length; i++) {
+            System.out.println("    " + tierTable[i]);
+        }
+
+        if (stranded.length > 0) {
+            System.out.println();
+            System.out.println("  Who misses out, highest tier first:");
+            printBookings(null, stranded);
+            OutputHelper.printBlue("  Housekeeping can fix this by cleaning more rooms of those"
+                    + " types, or the guest can be moved up to a better room if one is free.");
+        }
+
+        System.out.println();
+        OutputHelper.printReportFooter(String.format(
+                "Arrivals : %d    Rooms ready : %d    Without a room : %d",
+                arrivals.length, control.readyRoomCount(), stranded.length));
+        InputHelper.waitForEnter();
+    }
+
+    /** Which types are short and which are fine, as one readable sentence. */
+    private String shortfallLine(RoomType[] types, int[] wanted, int[] ready) {
+        StringBuilder shortOf = new StringBuilder();
+        StringBuilder fine = new StringBuilder();
+        for (int i = 0; i < types.length; i++) {
+            int gap = wanted[i] - ready[i];
+            if (gap > 0) {
+                append(shortOf, types[i] + " is " + gap + " short");
+            } else {
+                append(fine, String.valueOf(types[i]));
+            }
+        }
+        if (fine.length() == 0) {
+            return shortOf + ".";
+        }
+        return shortOf + "; " + fine + (fine.indexOf(",") < 0 ? " is fine." : " are fine.");
+    }
+
+    private void append(StringBuilder list, String item) {
+        if (list.length() > 0) {
+            list.append(", ");
+        }
+        list.append(item);
+    }
+
     private void rangeAudit() {
-        OutputHelper.printTitle("Confirmation Range Audit");
+        OutputHelper.printTitle("Bookings and Money by Number Range");
 
         String low = InputHelper.readLine("\nFrom confirmation no. > ");
         String high = InputHelper.readLine("To confirmation no.   > ");
@@ -852,7 +999,7 @@ public class FrontDeskUI {
         batch = control.sortBy(batch, key, descending);
 
         System.out.println();
-        OutputHelper.printReportHeader("Confirmation Range Audit",
+        OutputHelper.printReportHeader("Bookings and Money by Number Range",
                 "confirmation no. " + low + " to " + high
                         + ", ordered by " + key + (descending ? " (high to low)" : " (low to high)"));
         System.out.println();
@@ -889,16 +1036,20 @@ public class FrontDeskUI {
 
         RoomType[] types = RoomType.values();
         double[] revenue = control.revenueByRoomType(batch);
-        String[] shareHeaders = {"ROOM TYPE", "CHARGE", "SHARE", ""};
-        Align[] shareAligns = {Align.LEFT, Align.RIGHT, Align.RIGHT, Align.LEFT};
+        String[] shareHeaders = {"ROOM TYPE", "CHARGE", "SHARE"};
+        Align[] shareAligns = {Align.LEFT, Align.RIGHT, Align.RIGHT};
         String[][] shareCells = new String[types.length][];
+        String[] typeLabels = new String[types.length];
+        int[] sharePercent = new int[types.length];
         for (int i = 0; i < types.length; i++) {
             double share = total == 0.0 ? 0.0 : revenue[i] * 100.0 / total;
+            typeLabels[i] = String.valueOf(types[i]);
+            // the chart plots whole percent: a bar cannot show a tenth anyway
+            sharePercent[i] = (int) Math.round(share);
             shareCells[i] = new String[]{
-                String.valueOf(types[i]),
+                typeLabels[i],
                 money(revenue[i]),
-                String.format("%.1f%%", share),
-                bar(share)
+                String.format("%.1f%%", share)
             };
         }
         System.out.println("  Charge by room type");
@@ -908,11 +1059,88 @@ public class FrontDeskUI {
         }
 
         System.out.println();
+        String[] chart = ChartRenderer.bars(typeLabels, sharePercent, "Share of total charge (%)", "Room type", 10);
+        for (int i = 0; i < chart.length; i++) {
+            System.out.println("    " + chart[i]);
+        }
+
+        printLoyaltyValue(batch, total);
+
+        System.out.println();
         OutputHelper.printReportFooter(String.format(
                 "Records : %d of %d on file    Total charge : %s    Average : %s",
                 batch.length, control.size(), money(total),
                 money(earning == 0 ? 0.0 : total / earning)));
         InputHelper.waitForEnter();
+    }
+
+    /**
+     * What the batch is worth to the loyalty programme. The money comes off the
+     * bookings, the tier off each booking's member, and the multiplier and the
+     * upgrade threshold off M5's tier requirements - so the answer is not in any
+     * one of the three places on its own.
+     */
+    private void printLoyaltyValue(Booking[] batch, double total) {
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+        int[] bookings = control.countByTier(batch);
+        int[] charge = control.chargeByTier(batch);
+        int[] reward = control.rewardPointsByTier(batch);
+
+        System.out.println();
+        System.out.println("  What this earns the loyalty programme");
+
+        String[] headers = {"TIER", "BOOKINGS", "CHARGE", "REWARD POINTS", "TIER POINTS",
+            "NEXT TIER NEEDS"};
+        Align[] aligns = {Align.LEFT, Align.RIGHT, Align.RIGHT, Align.RIGHT, Align.RIGHT,
+            Align.RIGHT};
+        String[][] cells = new String[tiers.length][];
+        for (int i = 0; i < tiers.length; i++) {
+            int target = control.pointsToReachNextTier(tiers[i]);
+            cells[i] = new String[]{
+                String.valueOf(tiers[i]),
+                String.valueOf(bookings[i]),
+                money(charge[i]),
+                String.format("%,d", reward[i]),
+                String.format("%,d", charge[i]),
+                // a top tier and a threshold nobody filled in are both "no number",
+                // but only one of them is a gap in M5's data
+                !control.hasTierAbove(tiers[i]) ? "top tier"
+                        : target < 0 ? "not set" : String.format("%,d", target)
+            };
+        }
+        String[] table = TableRenderer.render(headers, cells, aligns);
+        for (int i = 0; i < table.length; i++) {
+            System.out.println("    " + table[i]);
+        }
+        OutputHelper.printBlue("    REWARD POINTS   = charge x that tier's multiplier,"
+                + " spendable on rewards only");
+        OutputHelper.printBlue("    TIER POINTS     = the charge itself - this is what moves"
+                + " a member up a tier");
+        OutputHelper.printBlue("    NEXT TIER NEEDS = tier points needed to reach the tier above."
+                + " \"not set\" means no threshold is on file, so nobody can move up from there");
+
+        // the finding: the multiplier makes the top tiers cost more than they spend
+        int topCharge = 0;
+        int topReward = 0;
+        int allCharge = 0;
+        int allReward = 0;
+        for (int i = 0; i < tiers.length; i++) {
+            allCharge += charge[i];
+            allReward += reward[i];
+            if (tiers[i] == LoyaltyTier.GOLD || tiers[i] == LoyaltyTier.PLATINUM) {
+                topCharge += charge[i];
+                topReward += reward[i];
+            }
+        }
+        System.out.println();
+        if (allReward == 0 || allCharge == 0) {
+            OutputHelper.printBlue("    No reward points are earned by this batch.");
+        } else {
+            OutputHelper.printBlue(String.format(
+                    "    Gold and Platinum are %.0f%% of the charge but %.0f%% of the reward"
+                            + " points. The multiplier is where the programme's cost sits.",
+                    topCharge * 100.0 / allCharge, topReward * 100.0 / allReward));
+        }
     }
 
     /** Null means the user backed out. */
@@ -946,10 +1174,6 @@ public class FrontDeskUI {
             }
             OutputHelper.printErr("Please enter 1 or 2.");
         }
-    }
-
-    private String bar(double percent) {
-        return "#".repeat((int) Math.round(percent / 5.0));
     }
 
     private String money(double amount) {

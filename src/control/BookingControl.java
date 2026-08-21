@@ -9,6 +9,7 @@ import entity.LoyaltyTier;
 import entity.Member;
 import entity.Room;
 import entity.RoomType;
+import entity.TierRequirement;
 import java.time.LocalDate;
 import java.util.Iterator;
 import java.util.Random;
@@ -229,6 +230,117 @@ public class BookingControl {
         return null;
     }
 
+    // ---- report: arrival readiness ----
+    //
+    // The query behind the report: bookings due in, joined to the member they
+    // belong to for the tier, to the room type they asked for, and to M3's room
+    // pool for what is actually cleaned and free. No one collection holds all
+    // four, which is why the desk cannot answer this by listing anything.
+
+    /**
+     * Confirmed bookings due to arrive within the window, in the tree's in-order
+     * walk. Checked-in guests are already housed and cancelled ones are not
+     * coming, so neither competes for a room.
+     */
+    public Booking[] arrivalsWithin(int days){
+        LocalDate today = LocalDate.now();
+        LocalDate until = today.plusDays(days);
+        Booking[] buffer = new Booking[bookings.size()];
+        int due = 0;
+        Iterator<Booking> walker = bookings.getIterator();
+        while(walker.hasNext()){
+            Booking booking = walker.next();
+            if(!STATUS_CONFIRMED.equals(booking.getStatus()) || booking.isAllocated()){
+                continue;
+            }
+            LocalDate arrival = booking.getCheckIn();
+            if(!arrival.isBefore(today) && !arrival.isAfter(until)){
+                buffer[due++] = booking;
+            }
+        }
+        Booking[] arrivals = new Booking[due];
+        for(int i = 0; i < due; i++){
+            arrivals[i] = buffer[i];
+        }
+        return arrivals;
+    }
+
+    /** Bookings per loyalty tier, indexed by LoyaltyTier.ordinal(). */
+    public int[] countByTier(Booking[] batch){
+        int[] byTier = new int[LoyaltyTier.values().length];
+        for(Booking booking : batch){
+            byTier[booking.getMember().getCurrentTier().ordinal()]++;
+        }
+        return byTier;
+    }
+
+    /**
+     * The order the desk would hand rooms out in: tier first, then whoever is due
+     * to arrive soonest.
+     * <p>
+     * Two keys, which {@link #sortBy} cannot express - it orders on one column -
+     * so this is its own sort rather than a new SortKey constant. Insertion sort
+     * again, and for the same reason: the batch arrives already ordered on
+     * confirmation number and only the out-of-place entries cost anything.
+     */
+    public Booking[] sortByPriority(Booking[] source){
+        Booking[] sorted = new Booking[source.length];
+        for(int i = 0; i < source.length; i++){
+            sorted[i] = source[i];
+        }
+
+        for(int i = 1; i < sorted.length; i++){
+            Booking moving = sorted[i];
+            int j = i - 1;
+            while(j >= 0 && yieldsTo(sorted[j], moving)){
+                sorted[j + 1] = sorted[j];
+                j--;
+            }
+            sorted[j + 1] = moving;
+        }
+        return sorted;
+    }
+
+    /** True when settled should give way to moving and slide up a place. */
+    private boolean yieldsTo(Booking settled, Booking moving){
+        int byTier = moving.getMember().getCurrentTier().getWeight()
+                - settled.getMember().getCurrentTier().getWeight();
+        if(byTier != 0){
+            return byTier > 0;
+        }
+        return settled.getCheckIn().isAfter(moving.getCheckIn());
+    }
+
+    /**
+     * The arrivals that would find no room, once the ready rooms of each type are
+     * handed out in priority order.
+     * <p>
+     * Same room type only. M2 will upgrade a guest into a better room when it has
+     * to, so this is the pessimistic count - the desk would rather be told it is
+     * two rooms short and be wrong than the other way round.
+     */
+    public Booking[] unhoused(Booking[] batch){
+        int[] left = readyByType();
+        Booking[] ordered = sortByPriority(batch);
+        Booking[] buffer = new Booking[ordered.length];
+        int stranded = 0;
+
+        for(Booking booking : ordered){
+            int type = booking.getRoomType().ordinal();
+            if(left[type] > 0){
+                left[type]--;
+            } else {
+                buffer[stranded++] = booking;
+            }
+        }
+
+        Booking[] short_ = new Booking[stranded];
+        for(int i = 0; i < stranded; i++){
+            short_[i] = buffer[i];
+        }
+        return short_;
+    }
+
     // ---- room pool, as M2 sees it ----
 
     /**
@@ -244,6 +356,11 @@ public class BookingControl {
         return allocationControl == null
                 ? new int[RoomType.values().length]
                 : allocationControl.getReadyByType();
+    }
+
+    /** Rooms of any type that could be handed over right now. */
+    public int readyRoomCount(){
+        return allocationControl == null ? 0 : allocationControl.getReadyRoomCount();
     }
 
     /** Bookings already queued for each room type, which is the competition. */
@@ -646,7 +763,70 @@ public class BookingControl {
             return revenue;
         }
 
-        /** Interface-typed on purpose: any team collection can be counted this way. */
+        // ---- report: what a batch is worth to the loyalty programme ----
+    //
+    // M5 keeps two separate point balances and they are not interchangeable:
+    // spending raises seasonal points one-for-one and those are what move a
+    // member up a tier, while reward points are the same spend multiplied by the
+    // tier's own multiplier and are only good for redeeming. Reporting one as the
+    // other would overstate how close everybody is to an upgrade.
+
+    /** Charge per tier in whole ringgit, indexed by LoyaltyTier.ordinal(). */
+    public int[] chargeByTier(Booking[] batch){
+        int[] charge = new int[LoyaltyTier.values().length];
+        for(Booking booking : batch){
+            if(earnsRevenue(booking)){
+                charge[booking.getMember().getCurrentTier().ordinal()]
+                        += (int) Math.round(revenueOf(booking));
+            }
+        }
+        return charge;
+    }
+
+    /**
+     * Reward points the batch earns per tier - the spend multiplied by whatever
+     * multiplier that tier carries. This is the programme's cost of the batch,
+     * not progress towards anything.
+     */
+    public int[] rewardPointsByTier(Booking[] batch){
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+        int[] charge = chargeByTier(batch);
+        int[] points = new int[tiers.length];
+        for(int i = 0; i < tiers.length; i++){
+            points[i] = charge[i] * pointMultiplierOf(tiers[i]);
+        }
+        return points;
+    }
+
+    public int pointMultiplierOf(LoyaltyTier tier){
+        TierRequirement requirement = requirementOf(tier);
+        return requirement == null ? 1 : requirement.getPointMultiplier();
+    }
+
+    /**
+     * Seasonal points needed to reach the tier above this one, or -1 when there
+     * is none to reach. Platinum is the top of the programme, and the seed also
+     * leaves the figure unset there, so both cases have to read as "no target".
+     */
+    public int pointsToReachNextTier(LoyaltyTier tier){
+        LoyaltyTier[] tiers = LoyaltyTier.values();
+        if(tier == null || tier.ordinal() + 1 >= tiers.length){
+            return -1;
+        }
+        TierRequirement next = requirementOf(tiers[tier.ordinal() + 1]);
+        return next == null ? -1 : next.getPointsToUpgradeTier();
+    }
+
+    /** Whether the programme has a tier above this one at all. */
+    public boolean hasTierAbove(LoyaltyTier tier){
+        return tier != null && tier.ordinal() + 1 < LoyaltyTier.values().length;
+    }
+
+    private TierRequirement requirementOf(LoyaltyTier tier){
+        return loyaltyControl == null ? null : loyaltyControl.findTierRequirement(tier);
+    }
+
+    /** Interface-typed on purpose: any team collection can be counted this way. */
         public static int countIn(CollectionInterface<?> collection){
             return collection.size();
         }
