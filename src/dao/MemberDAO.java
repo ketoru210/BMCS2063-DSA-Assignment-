@@ -55,6 +55,7 @@ public class MemberDAO {
     private static final Promotion COMPLIMENTARY_BREAKFAST = new Promotion("Complimentary Breakfast", "Gold and Platinum members enjoy complimentary breakfast during their stay.", "01-01-2026", "31-12-2026", new LoyaltyTier[]{LoyaltyTier.GOLD, LoyaltyTier.PLATINUM});
     private static final Promotion PLATINUM_ROOM_UPGRADE = new Promotion("Platinum Room Upgrade", "Platinum members receive a complimentary room upgrade, subject to availability.", "01-01-2026", "31-12-2026", new LoyaltyTier[]{LoyaltyTier.PLATINUM});
     private static final Promotion BIRTHDAY_CELEBRATION = new Promotion("Birthday Celebration", "Enjoy a special dining benefit during your birthday month.", "01-01-2026", "31-12-2026", new LoyaltyTier[]{LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM});
+    private static final Promotion GUEST_TRIAL_OFFER = new Promotion("Guest Trial Offer", "First-time guests enjoy 5% off their next stay.", "01-01-2026", "31-12-2026", new LoyaltyTier[]{LoyaltyTier.GUEST});
 
     private static final Promotion[] PROMOTIONS = {
             WELCOME_BACK, SILVER_DINING, GOLD_DINING, PLATINUM_DINING, WEEKEND_ESCAPE,
@@ -63,7 +64,7 @@ public class MemberDAO {
 
     private static final MemberSeed[] SEEDS = {
             new MemberSeed(
-                    new Member("tanwm", "pw1234", "Tan Wei Ming", LoyaltyTier.PLATINUM),
+                    seeded("tanwm", "pw1234", "Tan Wei Ming", LoyaltyTier.PLATINUM, 15000),
                     new Promotion[]{WELCOME_BACK, PLATINUM_DINING, PLATINUM_SPA, COMPLIMENTARY_BREAKFAST, PLATINUM_ROOM_UPGRADE, BIRTHDAY_CELEBRATION},
                     new Notification[]{
                             new Notification("Platinum Tier Achieved", "Congratulations! You have reached Platinum tier.", "01-01-2026", NotificationType.TIER_CHANGE),
@@ -75,64 +76,86 @@ public class MemberDAO {
                     },
                     new Redemption[]{
                             new Redemption("Dining Voucher", "RM100 Dining Voucher", 1800, "10-02-2026"),
-                            new Redemption("Spa Voucher", "RM60 Spa Voucher", 1400, "20-02-2026")
+                            new Redemption("Spa Voucher", "RM60 Spa Voucher", 1400, "20-02-2026"),
+                            new Redemption("Dining Voucher", "RM100 Dining Voucher", 1800, "18-03-2026")
                     },
-                    new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.PLATINUM, 15000) }
+                    new Tier[]{
+                            new Tier("01-07-2025 to 31-12-2025", LoyaltyTier.SILVER, 5200),
+                            new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.GOLD, 9800),
+                            new Tier("01-07-2026 to 31-12-2026", LoyaltyTier.PLATINUM, 15000)
+                    }
             ),
             new MemberSeed(
-                    new Member("wongsh", "pw1234", "Wong Siew Hoon", LoyaltyTier.PLATINUM),
+                    seeded("wongsh", "pw1234", "Wong Siew Hoon", LoyaltyTier.PLATINUM, 12500),
                     new Promotion[]{WELCOME_BACK, PLATINUM_DINING, COMPLIMENTARY_BREAKFAST, PLATINUM_ROOM_UPGRADE},
                     new Notification[]{ new Notification("Platinum Tier Benefits", "Your Platinum membership benefits are now active.", "01-01-2026", NotificationType.TIER_CHANGE) },
-                    new Redemption[]{},
-                    new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.PLATINUM, 12000) }
+                    new Redemption[]{
+                            new Redemption("Dining Voucher", "RM100 Dining Voucher", 1800, "22-02-2026"),
+                            new Redemption("Room Upgrade", "Room Upgrade", 1500, "01-03-2026")
+                    },
+                    new Tier[]{
+                            new Tier("01-07-2025 to 31-12-2025", LoyaltyTier.GOLD, 8600),
+                            new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.PLATINUM, 12000)
+                    }
             ),
             new MemberSeed(
-                    new Member("nurula", "pw1234", "Nurul Aina", LoyaltyTier.GOLD),
+                    seeded("nurula", "pw1234", "Nurul Aina", LoyaltyTier.GOLD, 8100),
                     new Promotion[]{WELCOME_BACK, GOLD_DINING, GOLD_SPA, COMPLIMENTARY_BREAKFAST, BIRTHDAY_CELEBRATION},
                     new Notification[]{
                             new Notification("Gold Tier Achieved", "Congratulations! You have reached Gold tier.", "05-01-2026", NotificationType.TIER_CHANGE),
                             new Notification("Complimentary Breakfast", "You are eligible for complimentary breakfast during your stay.", "10-01-2026", NotificationType.PROMOTION),
                             new Notification("Festive Season Event", "Join us for our special festive season event.", "15-02-2026", NotificationType.ANNOUNCEMENT)
                     },
-                    new Redemption[]{ new Redemption("Breakfast", "Complimentary Breakfast", 750, "12-02-2026") },
+                    new Redemption[]{
+                            new Redemption("Breakfast", "Complimentary Breakfast", 750, "12-02-2026"),
+                            new Redemption("Spa Voucher", "RM30 Spa Voucher", 800, "05-03-2026")
+                    },
                     new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.GOLD, 7000) }
             ),
             new MemberSeed(
-                    new Member("limkx", "pw1234", "Lim Kai Xin", LoyaltyTier.GOLD),
+                    seeded("limkx", "pw1234", "Lim Kai Xin", LoyaltyTier.GOLD, 6300),
                     new Promotion[]{WELCOME_BACK, GOLD_DINING, GOLD_SPA, COMPLIMENTARY_BREAKFAST},
                     new Notification[]{
                             new Notification("Gold Tier Benefits", "Your Gold membership benefits are now active.", "01-01-2026", NotificationType.TIER_CHANGE),
                             new Notification("Gold Dining Deal", "You can now enjoy 20% off selected dining outlets.", "05-01-2026", NotificationType.PROMOTION)
                     },
-                    new Redemption[]{},
+                    new Redemption[]{
+                            new Redemption("Breakfast", "Complimentary Breakfast", 750, "14-02-2026"),
+                            new Redemption("Spa Voucher", "RM30 Spa Voucher", 800, "20-03-2026")
+                    },
                     new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.GOLD, 6000) }
             ),
             new MemberSeed(
-                    new Member("rajesh", "pw1234", "Rajesh Naidu", LoyaltyTier.GOLD),
+                    seeded("rajesh", "pw1234", "Rajesh Naidu", LoyaltyTier.GOLD, 5700),
                     new Promotion[]{WELCOME_BACK, GOLD_DINING, COMPLIMENTARY_BREAKFAST, BIRTHDAY_CELEBRATION},
                     new Notification[]{ new Notification("Gold Tier Achieved", "Congratulations! You have reached Gold tier.", "08-01-2026", NotificationType.TIER_CHANGE) },
                     new Redemption[]{},
                     new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.GOLD, 5500) }
             ),
             new MemberSeed(
-                    new Member("ravic", "pw1234", "Ravi Chandran", LoyaltyTier.SILVER),
+                    seeded("ravic", "pw1234", "Ravi Chandran", LoyaltyTier.SILVER, 3200),
                     new Promotion[]{WELCOME_BACK, SILVER_DINING, WEEKEND_ESCAPE, BIRTHDAY_CELEBRATION},
                     new Notification[]{
                             new Notification("Welcome to Silver", "Welcome to the Silver membership tier.", "01-01-2026", NotificationType.TIER_CHANGE),
                             new Notification("Weekend Escape", "Enjoy 15% off weekend room bookings.", "01-03-2026", NotificationType.PROMOTION)
                     },
-                    new Redemption[]{ new Redemption("Welcome Drink", "Welcome Drink", 300, "15-02-2026") },
+                    new Redemption[]{
+                            new Redemption("Welcome Drink", "Welcome Drink", 300, "15-02-2026"),
+                            new Redemption("Dining Voucher", "RM20 Dining Voucher", 500, "01-03-2026")
+                    },
                     new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.SILVER, 2500) }
             ),
             new MemberSeed(
-                    new Member("sitiz", "pw1234", "Siti Zubaidah", LoyaltyTier.SILVER),
+                    seeded("sitiz", "pw1234", "Siti Zubaidah", LoyaltyTier.SILVER, 2100),
                     new Promotion[]{WELCOME_BACK, SILVER_DINING, BIRTHDAY_CELEBRATION},
                     new Notification[]{ new Notification("Welcome to Silver", "Welcome to the Silver membership tier.", "01-01-2026", NotificationType.TIER_CHANGE) },
-                    new Redemption[]{},
+                    new Redemption[]{
+                            new Redemption("Welcome Drink", "Welcome Drink", 300, "10-02-2026")
+                    },
                     new Tier[]{ new Tier("01-01-2026 to 30-06-2026", LoyaltyTier.SILVER, 1800) }
             ),
             new MemberSeed(
-                    new Member("gohyl", "pw1234", "Goh Yee Ling", LoyaltyTier.SILVER),
+                    seeded("gohyl", "pw1234", "Goh Yee Ling", LoyaltyTier.SILVER, 2600),
                     new Promotion[]{WELCOME_BACK, SILVER_DINING, WEEKEND_ESCAPE},
                     new Notification[]{ new Notification("Welcome to Silver", "Welcome to the Silver membership tier.", "01-02-2026", NotificationType.TIER_CHANGE) },
                     new Redemption[]{},
@@ -140,33 +163,39 @@ public class MemberDAO {
             ),
             new MemberSeed(
                     new Member("chongml", "pw1234", "Chong Mei Ling", LoyaltyTier.GUEST),
-                    new Promotion[]{},
+                    new Promotion[]{GUEST_TRIAL_OFFER},
                     new Notification[]{ new Notification("Swimming Pool Closure", "The swimming pool will be temporarily closed for maintenance.", "10-03-2026", NotificationType.ANNOUNCEMENT) },
                     new Redemption[]{},
                     new Tier[]{}
             ),
             new MemberSeed(
                     new Member("arunk", "pw1234", "Arun Kumar", LoyaltyTier.GUEST),
-                    new Promotion[]{},
+                    new Promotion[]{GUEST_TRIAL_OFFER},
                     new Notification[]{ new Notification("Festive Season Event", "Join us for our special festive season event.", "15-02-2026", NotificationType.ANNOUNCEMENT) },
                     new Redemption[]{},
                     new Tier[]{}
             ),
             new MemberSeed(
                     new Member("faridah", "pw1234", "Faridah Hassan", LoyaltyTier.GUEST),
-                    new Promotion[]{},
+                    new Promotion[]{GUEST_TRIAL_OFFER},
                     new Notification[]{},
                     new Redemption[]{},
                     new Tier[]{}
             ),
             new MemberSeed(
                     new Member("leejh", "pw1234", "Lee Jun Hao", LoyaltyTier.GUEST),
-                    new Promotion[]{},
+                    new Promotion[]{GUEST_TRIAL_OFFER},
                     new Notification[]{},
                     new Redemption[]{},
                     new Tier[]{}
             )
     };
+
+    private static Member seeded(String username, String password, String name, LoyaltyTier tier, int seasonalPoints) {
+        Member member = new Member(username, password, name, tier);
+        member.setSeasonalPoints(seasonalPoints);
+        return member;
+    }
 
     public CollectionInterface<Member> getAllMembers() {
         CollectionInterface<Member> members = new DoublyLinkedList<>();
