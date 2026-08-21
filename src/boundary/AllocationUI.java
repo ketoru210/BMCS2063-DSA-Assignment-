@@ -59,6 +59,7 @@ public class AllocationUI {
         SERVE("Serve Next Request"),
         ADD("Add Request to Queue"),
         CANCEL("Cancel a Request"),
+        RECATEGORISE("Change a Special Category"),
         REPRIORITISE("Reprioritise Changed Tiers"),
         SEARCH("Search the Queue"),
         FILTER("Filter the Queue"),
@@ -113,6 +114,9 @@ public class AllocationUI {
                     break;
                 case CANCEL:
                     cancelRequest();
+                    break;
+                case RECATEGORISE:
+                    recategoriseRequest();
                     break;
                 case REPRIORITISE:
                     reprioritiseQueue();
@@ -399,6 +403,75 @@ public class AllocationUI {
                 continue;
             }
             notice = "Removed #" + entry.getEntryNo() + " from the queue.";
+            return;
+        }
+    }
+
+    /**
+     * Corrects the band a waiting request sits in. The serve position is read
+     * either side of the change, because the band is the first thing the ordering
+     * looks at and the whole point of the edit is where the entry lands.
+     */
+    private void recategoriseRequest() {
+        for (;;) {
+            Allocation[] waiting = control.getServeOrder();
+            if (waiting.length == 0) {
+                fail("The queue is empty.");
+                return;
+            }
+
+            String[][] cells = new String[waiting.length][];
+            for (int i = 0; i < waiting.length; i++) {
+                Allocation entry = waiting[i];
+                cells[i] = new String[]{
+                    String.valueOf(i + 1),
+                    "#" + entry.getEntryNo(),
+                    entry.getBooking().getConfirmationNo(),
+                    entry.getBooking().getMember().getName(),
+                    String.valueOf(entry.getTier()),
+                    String.valueOf(entry.getCategory()),
+                    String.valueOf(control.getServePosition(entry))
+                };
+            }
+            int pick = askFromTable("Waiting requests, in serve order:",
+                    new String[]{"No.", "Entry", "Conf No.", "Customer", "Tier",
+                        "Category", "Serve Pos."},
+                    cells,
+                    new Align[]{Align.RIGHT, Align.LEFT, Align.LEFT, Align.LEFT, Align.LEFT,
+                        Align.LEFT, Align.RIGHT});
+            if (pick < 0) {
+                return;
+            }
+
+            Allocation entry = waiting[pick];
+            SpecialCategory[] bands = SpecialCategory.values();
+            String[] bandLabels = new String[bands.length];
+            for (int i = 0; i < bands.length; i++) {
+                bandLabels[i] = (bands[i] == SpecialCategory.NONE ? "None" : bands[i].toString())
+                        + (bands[i] == entry.getCategory() ? "   (current)" : "");
+            }
+            int band = askFrom("#" + entry.getEntryNo() + " is in "
+                    + entry.getCategory() + ". Move it to:", bandLabels);
+            if (band < 0) {
+                // backing out of the band only undoes the entry just picked
+                continue;
+            }
+
+            SpecialCategory was = entry.getCategory();
+            int positionBefore = control.getServePosition(entry);
+            if (!control.recategorise(entry, bands[band])) {
+                OutputHelper.printErr(bands[band] == was
+                        ? "#" + entry.getEntryNo() + " is already in " + was + "."
+                        : "That request could not be moved.");
+                continue;
+            }
+
+            int positionAfter = control.getServePosition(entry);
+            notice = "#" + entry.getEntryNo() + " moved from " + was + " to "
+                    + entry.getCategory() + ", served " + positionBefore
+                    + (positionBefore == positionAfter
+                            ? " as before."
+                            : " -> " + positionAfter + " of " + control.size() + ".");
             return;
         }
     }

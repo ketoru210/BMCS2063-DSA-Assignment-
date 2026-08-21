@@ -432,6 +432,32 @@ public class AllocationControl {
     }
 
     /**
+     * Moves a waiting entry into a different special band and returns whether it
+     * moved. Categories are set by the desk when the request is taken, and the
+     * reason behind one - a failed lift, a complaint upheld - is often learnt
+     * after the request is already waiting.
+     * <p>
+     * Out of the heap before the band changes and back in afterwards, the same
+     * order {@link #reprioritise()} uses and for the same reason: remove(T)
+     * locates by compareTo, and the band is the first thing compareTo reads, so
+     * mutating it first would send the search down the wrong subtree.
+     * <p>
+     * The tier key is deliberately left alone. A band correction is not a re-key,
+     * and folding the two together would let a tier change ride in unannounced on
+     * an unrelated edit.
+     */
+    public boolean recategorise(Allocation entry, SpecialCategory category) {
+        if (entry == null || category == null || category == entry.getCategory()) {
+            return false;
+        }
+        if (!queue.remove(entry)) {
+            return false;
+        }
+        entry.setCategory(category);
+        return queue.add(entry);
+    }
+
+    /**
      * Whether the stored key still matches what the rule would compute now. The
      * key is a snapshot taken at admission and a tier change over in M5 does not
      * reach into this queue, so this is what asks whether the snapshot has aged out.

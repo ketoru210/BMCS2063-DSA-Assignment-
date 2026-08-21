@@ -16,7 +16,7 @@ public class Allocation implements Serializable, Comparable<Allocation> {
     private static final long serialVersionUID = 1L;
 
     private final Booking booking;
-    private final SpecialCategory category;
+    private SpecialCategory category;
     private final int arrivalMinute;
     private final int entryNo;
 
@@ -60,6 +60,18 @@ public class Allocation implements Serializable, Comparable<Allocation> {
     // set by the control before add(), and again only on a deliberate reprioritise
     public void setInvariantPriority(long invariantPriority) {
         this.invariantPriority = invariantPriority;
+    }
+
+    /**
+     * The band an entry sits in can be corrected after it joined - what a request
+     * is protecting is a judgement the desk makes, and judgements are revised.
+     * <p>
+     * Only ever called while the entry is outside the heap: it is the first thing
+     * compareTo reads, so moving it on an entry still in the heap leaves the heap
+     * ordered by a key that no longer exists.
+     */
+    public void setCategory(SpecialCategory category) {
+        this.category = category;
     }
 
     @Override
