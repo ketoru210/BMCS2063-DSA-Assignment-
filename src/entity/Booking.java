@@ -99,11 +99,6 @@ public class Booking implements Serializable, Comparable<Booking> {
     }
 
     @Override
-    public int hashCode() {
-        return confirmationNo.hashCode();
-    }
-
-    @Override
     public String toString() {
         return String.format("%s | %-18s | %-6s | %-6s | %s - %s | %s",
                 confirmationNo,

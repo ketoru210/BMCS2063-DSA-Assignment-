@@ -93,11 +93,6 @@ public class Allocation implements Serializable, Comparable<Allocation> {
     }
 
     @Override
-    public int hashCode() {
-        return entryNo;
-    }
-
-    @Override
     public String toString() {
         return String.format("#%-3d | %-18s | %-8s | %-12s | arrived %3d min | S=%d",
                 entryNo,
